@@ -53,9 +53,11 @@ R = [
 ('''    toast(bitten
       ? `Bid placed \\u2014 you took ${Math.round(bitten*SQIN)} sq in off ${Object.keys(ev.lostBy).length} brand(s).`
       : `Bid placed \\u2014 ${Math.round(ev.winArea)} sq in of open fabric is yours.`, "good");''',
- '''    toast(bitten
-      ? `Bid accepted. ${Math.round(bitten*SQIN)} sq in taken from ${Object.keys(ev.lostBy).length} brand(s) at a higher rate.`
-      : `Bid accepted. ${Math.round(ev.winArea)} sq in allocated.`, "good");'''),
+ '''    const r = $("lst-submit").getBoundingClientRect();
+    burst(r.left + r.width/2, r.top);
+    toast(bitten
+      ? `Yours. ${Math.round(bitten*SQIN)} sq in ripped off ${Object.keys(ev.lostBy).length} brand(s).`
+      : `Yours. ${Math.round(ev.winArea)} sq in of open fabric.`, "good");'''),
 
 ('toast(name + " took " + Math.round(ev.bite.length*SQIN) + " sq in off you at " + money2(d) + "/in\\u00b2.", "bad");',
  'toast(name + " outrated you at " + money2(d) + "/in\\u00b2 \\u2014 " + Math.round(ev.bite.length*SQIN) + " sq in reallocated.", "bad");'),
@@ -65,9 +67,11 @@ R = [
 
 ('''        if(current === "client" && session && c.id === session.coupleId)
           toast("Bidding closed. " + c.mkt.holders.filter(h=>h.cells>0).length + " brands are on your dress.", "good");''',
- '''        if(current === "client" && session && c.id === session.coupleId)
-          toast("Closed. " + c.mkt.holders.filter(h=>h.cells>0).length +
-                " brands hold allocations, settling " + money(raisedOf(c)) + ".", "good");'''),
+ '''        if(current === "client" && session && c.id === session.coupleId){
+          burst();
+          toast("Sold. " + c.mkt.holders.filter(h=>h.cells>0).length +
+                " brands on your dress, " + money(raisedOf(c)) + " in the bank.", "good");
+        }'''),
 
 ('''    $("auth-title").textContent = authMode === "up" ? "Create your account" : "Welcome back";
     $("auth-lead").textContent  = authMode === "up"
@@ -91,6 +95,8 @@ R = [
     $("auth-swap").innerHTML = authMode === "up"
       ? `Already have an account? <button id="auth-toggle">Sign in</button>`
       : `New here? <button id="auth-toggle">Open an account</button>`;'''),
+('  const PALETTE = ["#6C3483","#B03A2E","#117A65","#B9770E","#A23A73","#5F6B1F","#34495E","#8A5A2B"];\n  const MINE_COLOR = "#1E4B7A";',
+ '  /* Bright, well-separated hues - these sit on a deep violet ground, not white. */\n  const PALETTE = ["#FF6A9F","#FFAE2B","#7FD4FF","#C6F32B","#FF8A5B","#59E0A8","#FFD166","#8AA0FF"];\n  const MINE_COLOR = "#C08BFF";'),
 ]
 
 for a, b in R:
@@ -101,8 +107,69 @@ for a, b in R:
 
 EXTRA = r'''
   /* ============================================================
-     SPEC BAR + HERO TECHNICAL FLAT
+     MOTION LAYER
      ============================================================ */
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* headline: word-by-word entrance */
+  (function heroWords(){
+    const el = $("hero-h1");
+    if(!el) return;
+    const line = ["You", "own", "the", "most", "photographed", "surface", "in", "the", "room."];
+    el.innerHTML = line.map((w,i) =>
+      `<span class="w" style="animation-delay:${0.05 + i*0.055}s">${w}</span>`).join(" ") +
+      ` <em class="w grad" style="animation-delay:${0.05 + line.length*0.055}s">Charge for it.</em>`;
+  })();
+
+  /* reveal on scroll */
+  (function reveals(){
+    const io = new IntersectionObserver(es => es.forEach(e => {
+      if(e.isIntersecting){ e.target.classList.add("shown"); io.unobserve(e.target); }
+    }), {threshold:.12, rootMargin:"0px 0px -8%"});
+    document.querySelectorAll(".rv").forEach(el => io.observe(el));
+  })();
+
+  /* count-ups + rate-card heat bars, once they scroll into view */
+  (function counters(){
+    const run = el => {
+      const target = +el.dataset.count, pre = el.dataset.prefix || "", suf = el.dataset.suffix || "";
+      if(reduced){ el.textContent = pre + target.toLocaleString("en-US") + suf; return; }
+      const t0 = performance.now(), dur = 1400;
+      (function step(t){
+        const k = Math.min(1, (t-t0)/dur), e = 1 - Math.pow(1-k, 3);
+        el.textContent = pre + Math.round(target*e).toLocaleString("en-US") + suf;
+        if(k < 1) requestAnimationFrame(step);
+      })(t0);
+    };
+    const io = new IntersectionObserver(es => es.forEach(e => {
+      if(!e.isIntersecting) return;
+      e.target.querySelectorAll("[data-count]").forEach(run);
+      e.target.querySelectorAll("[data-heat]").forEach(b => b.style.width = b.dataset.heat + "%");
+      io.unobserve(e.target);
+    }), {threshold:.3});
+    document.querySelectorAll(".figures, .ratecard").forEach(el => io.observe(el));
+  })();
+
+  /* the hero gown you can actually poke */
+  function heroFlat(){
+    const el = $("hero-flat");
+    if(!el) return;
+    const tags = [
+      {x:50, y:31, c:"m", n:"BODICE",  a:28, r:24.00},
+      {x:35, y:63, c:"a", n:"SKIRT L", a:64, r:11.00},
+      {x:66, y:52, c:"l", n:"SASH",    a:22, r:19.00},
+      {x:50, y:88, c:"m", n:"TRAIN",   a:96, r:14.50}
+    ];
+    el.insertAdjacentHTML("afterbegin", gownSVG());
+    tags.forEach((t,i) => {
+      el.insertAdjacentHTML("beforeend",
+        `<span class="hp ${t.c}" style="left:${t.x}%;top:${t.y}%;animation-delay:${0.5 + i*0.14}s"
+               title="${t.n}: ${t.a} sq in at ${money2(t.r)} per square inch">
+           ${t.n} &middot; ${t.a} in&sup2; &middot; <b>${money(t.a*t.r)}</b></span>`);
+    });
+  }
+
+  /* ticker */
   function spec(){
     let under = 0, bids = 0, lots = 0, cells = 0, soon = Infinity;
     COUPLES.forEach(c => {
@@ -114,33 +181,40 @@ EXTRA = r'''
     $("k-purse").textContent = money(under);
     $("k-lots").textContent  = lots;
     $("k-bids").textContent  = bids;
-    $("k-rate").textContent  = cells ? money2(under/(cells*SQIN)) + "/in\u00b2" : "\u2014";
-    $("k-next").textContent  = soon < Infinity ? fmtClock(soon - Date.now()) : "\u2014";
+    $("k-rate").textContent  = cells ? money2(under/(cells*SQIN)) + "/in²" : "—";
+    $("k-next").textContent  = soon < Infinity ? fmtClock(soon - Date.now()) : "—";
   }
   setInterval(spec, 1000);
 
-  /** The hero gown, drawn as a technical flat with real dimensions on it. */
-  function heroFlat(){
-    const el = $("hero-flat");
-    if(!el) return;
-    const sellable = Math.round(TOTAL_CELLS * SQIN);
-    el.innerHTML = gownSVG() +
-      '<div class="dimv"><span>58 in</span></div>' +
-      '<div class="dimh"><span>44 in at the hem</span></div>' +
-      callout(50, 31, "right", "BODICE &middot; 28 in\u00b2") +
-      callout(35, 63, "left",  "SKIRT L &middot; 64 in\u00b2") +
-      callout(50, 88, "right", "TRAIN &middot; 96 in\u00b2") +
-      '<div class="callout" style="left:50%;top:6%;transform:translateX(-50%)">' +
-        '<span class="txt" style="border-color:var(--red);color:var(--red)">' +
-        sellable.toLocaleString("en-US") + ' in\u00b2 SELLABLE</span></div>';
+  /* confetti when you take ground, or when a gown settles */
+  const cfc = $("confetti"), cfx = cfc.getContext("2d");
+  let bits = [], cfRaf = null;
+  function burst(x, y){
+    if(reduced) return;
+    cfc.width = innerWidth; cfc.height = innerHeight;
+    const cols = ["#FF2E93","#FFAE2B","#2BE8C5","#C08BFF","#C6F32B"];
+    const ox = x == null ? innerWidth/2 : x, oy = y == null ? innerHeight*0.6 : y;
+    for(let i=0;i<160;i++)
+      bits.push({x:ox, y:oy, vx:(Math.random()-.5)*14, vy:-Math.random()*13-4,
+        s:3+Math.random()*6, c:cols[i%cols.length], r:Math.random()*6,
+        vr:(Math.random()-.5)*.34, life:1});
+    if(!cfRaf) cfRaf = requestAnimationFrame(cfStep);
   }
-  function callout(x, y, side, text){
-    const pos = side === "left" ? `right:${100-x}%` : `left:${x}%`;
-    return `<div class="callout ${side}" style="${pos};top:${y}%;transform:translateY(-50%)">
-      <span class="dot"></span><span class="lead"></span><span class="txt">${text}</span></div>`;
+  function cfStep(){
+    cfx.clearRect(0,0,cfc.width,cfc.height);
+    bits = bits.filter(b => b.life > 0);
+    bits.forEach(b => {
+      b.vy += .34; b.x += b.vx; b.y += b.vy; b.r += b.vr; b.life -= .0095;
+      cfx.save(); cfx.translate(b.x,b.y); cfx.rotate(b.r);
+      cfx.globalAlpha = Math.max(0,b.life); cfx.fillStyle = b.c;
+      cfx.fillRect(-b.s/2,-b.s/2,b.s,b.s*1.7); cfx.restore();
+    });
+    if(bits.length) cfRaf = requestAnimationFrame(cfStep);
+    else { cfRaf = null; cfx.clearRect(0,0,cfc.width,cfc.height); }
   }
 
 '''
+
 
 marker = '  /* ============================================================\n     BOOT'
 if marker not in js:

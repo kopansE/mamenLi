@@ -27,13 +27,19 @@ Then open `http://localhost:8000/squareinch.html`.
 
 ## Square Inch
 
-Proud, rational, exact. The audience is a woman who has costed her own wedding and
-worked out that the dress is the only line item that can earn. Nothing about the page
-apologises for that, and nothing is cute.
+Proud, rational, exact - and loud about it. The audience is a woman who has costed her
+own wedding and worked out that the dress is the only line item that can earn. Nothing
+about the page apologises for that, and nothing is cute.
 
-The look is a pattern-cutting table that happens to run a market: hairline rules,
-dimension lines, tabular figures, every number stated to the cent. Bodoni Moda carries
-the voice, Archivo carries the interface, and IBM Plex Mono carries every measurement.
+The look is a jewel box that runs a market: deep violet ground, magenta and amber and
+aqua, drifting light behind everything. Bodoni Moda carries the voice, Outfit carries
+the interface, IBM Plex Mono carries every measurement. The precision lives in the
+numbers, not the palette.
+
+Motion: the headline assembles word by word, sections rise as you reach them, the season
+figures count up, rate-card heat bars fill, the hero gown carries live price tags you can
+hover, holders land with a spring, and confetti fires when you take ground off a rival.
+All of it respects `prefers-reduced-motion`.
 
 The flow:
 
