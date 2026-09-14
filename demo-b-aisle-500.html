@@ -1,0 +1,854 @@
+<title>Aisle 500</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:ital,wdth,wght@0,75..125,400..900;1,75..125,400..900&display=swap">
+<style>
+  /* Committed single-world design: a trackside scoreboard. Every colour painted explicitly. */
+  :root{
+    --track:#0B0B11;
+    --asphalt:#14141D;
+    --kerb:#1F1F2C;
+    --line:#2E2E42;
+    --chalk:#F4F3FA;
+    --dim:#9A98B4;
+    --hot:#FF2D7E;
+    --volt:#FFE500;
+    --cyan:#00E1FF;
+    --green:#2BE08A;
+    --dress:#F4F3FA;
+    --dress-shade:#B9B7D0;
+    --skin:#E4C6AE;
+    --fs-1:clamp(3.2rem,11vw,9rem);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--track);color:var(--chalk);
+    font-family:"Archivo",-apple-system,"Segoe UI",sans-serif;
+    font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(900px 420px at 50% -8%, rgba(255,45,126,.16), transparent 70%);
+  }
+  .wrap{max-width:1240px;margin:0 auto;padding:0 22px}
+  h1,h2,h3{margin:0;font-family:"Anton",Impact,sans-serif;font-weight:400;letter-spacing:.005em;
+    text-transform:uppercase;line-height:.94;text-wrap:balance}
+  button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+  :focus-visible{outline:3px solid var(--volt);outline-offset:2px}
+  .num{font-variant-numeric:tabular-nums}
+  .skew{transform:skewX(-7deg);display:inline-block}
+
+  .checkers{
+    height:12px;
+    background:
+      repeating-conic-gradient(var(--chalk) 0% 25%, var(--track) 0% 50%) 0 0/24px 24px;
+  }
+
+  /* ---------- live bar ---------- */
+  .livebar{
+    display:flex;align-items:center;gap:26px;padding:10px 22px;background:var(--asphalt);
+    border-bottom:1px solid var(--line);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;
+    overflow-x:auto;white-space:nowrap;
+  }
+  .livebar .dotlive{width:9px;height:9px;border-radius:50%;background:var(--hot);flex:none;
+    box-shadow:0 0 0 0 rgba(255,45,126,.8);animation:ping 1.6s infinite}
+  @keyframes ping{70%{box-shadow:0 0 0 9px rgba(255,45,126,0)}100%{box-shadow:0 0 0 0 rgba(255,45,126,0)}}
+  @media(prefers-reduced-motion:reduce){.dotlive{animation:none}}
+  .livebar b{color:var(--volt);font-weight:800}
+  .livebar span.k{color:var(--dim)}
+
+  /* ---------- nav ---------- */
+  .nav{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 22px;max-width:1240px;margin:0 auto}
+  .logo{font-family:"Anton",sans-serif;font-size:1.5rem;letter-spacing:.02em;text-transform:uppercase}
+  .logo em{font-style:normal;color:var(--hot)}
+  .navlinks{display:flex;gap:8px}
+  .navlinks button{padding:8px 14px;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--dim);border:1px solid var(--line);border-radius:999px;transition:.2s}
+  .navlinks button:hover{color:var(--track);background:var(--volt);border-color:var(--volt)}
+  @media(max-width:760px){.navlinks{display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{padding:54px 0 44px;text-align:center;position:relative}
+  .hero h1{font-size:var(--fs-1);line-height:.84}
+  .hero h1 .l2{color:var(--hot)}
+  .hero .tag{margin:22px auto 0;max-width:44ch;font-size:1.06rem;color:var(--dim)}
+  .hero .tag b{color:var(--chalk);font-weight:700}
+  .stripes{display:flex;gap:6px;justify-content:center;margin:24px 0 0}
+  .stripes i{height:7px;width:60px;border-radius:4px;display:block}
+  .stripes i:nth-child(1){background:var(--hot)}
+  .stripes i:nth-child(2){background:var(--volt)}
+  .stripes i:nth-child(3){background:var(--cyan)}
+
+  /* ---------- role switch ---------- */
+  .roles{display:flex;gap:10px;justify-content:center;margin:36px 0 0;flex-wrap:wrap}
+  .roles button{
+    padding:14px 28px;border-radius:999px;border:2px solid var(--line);
+    font-family:"Anton",sans-serif;font-size:1rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);
+    transition:.2s}
+  .roles button[aria-selected="true"]{background:var(--volt);color:var(--track);border-color:var(--volt);
+    box-shadow:0 0 28px rgba(255,229,0,.32)}
+
+  /* ---------- floor ---------- */
+  .floor{display:grid;grid-template-columns:330px minmax(0,1fr) 320px;gap:20px;margin-top:30px;align-items:start}
+  @media(max-width:1080px){.floor{grid-template-columns:1fr;}}
+
+  .card{background:var(--asphalt);border:1px solid var(--line);border-radius:16px;padding:18px}
+  .card h3{font-size:1.15rem;margin-bottom:4px}
+  .card .sub{font-size:.82rem;color:var(--dim);margin:0 0 16px}
+
+  .stagewrap{position:relative;background:var(--asphalt);border:1px solid var(--line);border-radius:18px;padding:16px;overflow:hidden}
+  .stagewrap::before{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(180deg,transparent 0 44px,rgba(255,255,255,.022) 44px 45px);pointer-events:none}
+  .stagehead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;
+    font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);position:relative}
+  .stagehead b{color:var(--chalk)}
+  .canvas{position:relative;width:100%;aspect-ratio:5/7;border-radius:12px;overflow:hidden;
+    background:radial-gradient(120% 80% at 50% 6%, #24243A, #101019 70%)}
+  .canvas img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .canvas svg.gown{position:absolute;inset:0;width:100%;height:100%}
+  #confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:9}
+
+  .pod{
+    position:absolute;transform:translate(-50%,-50%);width:var(--w);height:var(--h);
+    border:2px solid var(--cyan);border-radius:9px;background:rgba(0,225,255,.1);
+    color:var(--cyan);display:grid;place-items:center;padding:2px;line-height:1.15;
+    transition:transform .18s,box-shadow .18s,background .18s;cursor:pointer}
+  .pod:hover{transform:translate(-50%,-50%) scale(1.06);background:rgba(0,225,255,.2);z-index:4}
+  .pod[data-sel="1"]{border-color:var(--volt);color:var(--volt);background:rgba(255,229,0,.16);
+    box-shadow:0 0 0 4px rgba(255,229,0,.18);z-index:3}
+  .pod[data-st="held"]{border-color:var(--line);color:var(--dim);background:rgba(255,255,255,.03);border-style:dashed}
+  .pod[data-st="hot"]{border-color:var(--hot);color:var(--hot);background:rgba(255,45,126,.16)}
+  .pod[data-st="won"]{border-color:var(--green);background:var(--track);cursor:default;color:var(--chalk)}
+  .pod .nm{font-size:.5rem;letter-spacing:.14em;text-transform:uppercase;opacity:.85}
+  .pod .pr{font-family:"Anton",sans-serif;font-size:.95rem;letter-spacing:.02em}
+  .pod .tm{font-size:.5rem;letter-spacing:.08em;font-variant-numeric:tabular-nums}
+  .pod .brandmark{display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center}
+  .pod .brandmark .b1{font-family:"Anton",sans-serif;font-size:.72rem;letter-spacing:.08em}
+  .pod .brandmark .b2{font-size:.44rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .bump{animation:bump .45s ease}
+  @keyframes bump{35%{transform:translate(-50%,-50%) scale(1.16)}}
+  .land{animation:land .6s cubic-bezier(.2,1.6,.4,1)}
+  @keyframes land{from{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-8deg)}}
+  @media(prefers-reduced-motion:reduce){.bump,.land{animation:none}}
+
+  /* ---------- lights ---------- */
+  .lights{position:absolute;inset:0;display:grid;place-items:center;z-index:10;
+    background:rgba(11,11,17,.88);backdrop-filter:blur(2px)}
+  .lights .row{display:flex;gap:14px}
+  .lights .row i{width:34px;height:34px;border-radius:50%;background:#2A1420;border:2px solid #3A1B2A;display:block}
+  .lights .row i.on{background:var(--hot);border-color:var(--hot);box-shadow:0 0 22px var(--hot)}
+  .lights .row i.go{background:var(--green);border-color:var(--green);box-shadow:0 0 26px var(--green)}
+  .lights p{font-family:"Anton",sans-serif;font-size:1.3rem;letter-spacing:.1em;text-transform:uppercase;margin:18px 0 0;text-align:center}
+
+  /* ---------- bid controls ---------- */
+  .clock{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    border:2px solid var(--cyan);border-radius:12px;padding:12px 14px;margin-bottom:14px;background:rgba(0,225,255,.07)}
+  .clock .t{font-family:"Anton",sans-serif;font-size:2.1rem;color:var(--cyan);line-height:1;font-variant-numeric:tabular-nums}
+  .clock .c{font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);text-align:right}
+  .clock.urgent{border-color:var(--hot);background:rgba(255,45,126,.12)}
+  .clock.urgent .t{color:var(--hot);animation:flash .8s infinite}
+  @keyframes flash{50%{opacity:.35}}
+  @media(prefers-reduced-motion:reduce){.clock.urgent .t{animation:none}}
+  .clock.done{border-color:var(--green);background:rgba(43,224,138,.1)}
+  .clock.done .t{color:var(--green);font-size:1.4rem;animation:none}
+
+  .bigprice{font-family:"Anton",sans-serif;font-size:2.9rem;line-height:1;color:var(--volt);font-variant-numeric:tabular-nums}
+  .bigprice small{display:block;font-family:"Archivo",sans-serif;font-size:.68rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--dim);margin-top:6px;font-weight:700}
+
+  .chips{display:flex;gap:8px;margin:16px 0 12px;flex-wrap:wrap}
+  .chips button{flex:1;min-width:70px;padding:10px 6px;border-radius:10px;border:2px solid var(--line);
+    font-family:"Anton",sans-serif;font-size:.92rem;color:var(--chalk);transition:.15s;text-align:center}
+  .chips button:hover{border-color:var(--cyan);color:var(--cyan);transform:translateY(-2px)}
+  .chips button.max{border-color:var(--hot);color:var(--hot)}
+  .chips button.max:hover{background:var(--hot);color:var(--track)}
+
+  .smash{
+    width:100%;padding:18px;border-radius:12px;background:var(--volt);color:var(--track);
+    font-family:"Anton",sans-serif;font-size:1.5rem;letter-spacing:.05em;text-transform:uppercase;
+    transition:transform .12s,box-shadow .2s,background .2s;box-shadow:0 6px 0 #B8A500}
+  .smash:hover{background:#FFF04D}
+  .smash:active{transform:translateY(5px);box-shadow:0 1px 0 #B8A500}
+  .smash[disabled]{background:var(--kerb);color:var(--dim);box-shadow:0 6px 0 #0E0E16;cursor:not-allowed}
+  .ghostbtn{width:100%;padding:12px;border-radius:10px;border:2px solid var(--line);color:var(--dim);
+    font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;font-weight:800;transition:.2s;margin-top:10px}
+  .ghostbtn:hover{border-color:var(--chalk);color:var(--chalk)}
+  .ghostbtn[disabled]{opacity:.35;cursor:not-allowed}
+  .upload{position:relative;overflow:hidden}
+  .upload input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+  .inp{width:100%;padding:11px 12px;border-radius:10px;background:var(--kerb);border:1px solid var(--line);
+    color:var(--chalk);font:inherit;font-size:.95rem}
+  .lbl{display:block;font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+    margin:0 0 6px;font-weight:800}
+  .fld{margin-bottom:14px}
+  input[type="range"]{width:100%;accent-color:var(--hot)}
+
+  /* ---------- ticker ---------- */
+  .tickerbox{border:1px solid var(--line);border-radius:16px;background:var(--asphalt);overflow:hidden}
+  .tickerhead{display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid var(--line);
+    font-family:"Anton",sans-serif;font-size:.9rem;letter-spacing:.08em;text-transform:uppercase}
+  .feed{list-style:none;margin:0;padding:6px 0;max-height:420px;overflow-y:auto}
+  .feed li{display:flex;align-items:baseline;gap:9px;padding:9px 16px;font-size:.84rem;border-bottom:1px solid rgba(46,46,66,.5);
+    animation:drop .35s ease both}
+  @keyframes drop{from{opacity:0;transform:translateX(-10px)}}
+  @media(prefers-reduced-motion:reduce){.feed li{animation:none}}
+  .feed .w{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .feed .a{font-family:"Anton",sans-serif;font-size:.95rem;color:var(--volt);font-variant-numeric:tabular-nums}
+  .feed li.me{background:rgba(255,229,0,.08)}
+  .feed li.me .w::after{content:" YOU";color:var(--volt);font-weight:900;font-size:.68rem;letter-spacing:.1em}
+  .feed li.won .a{color:var(--green)}
+  .feed .z{font-size:.68rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+
+  /* ---------- grid of weddings ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:26px}
+  .lot{background:var(--asphalt);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-align:left;transition:.22s}
+  .lot:hover{transform:translateY(-4px);border-color:var(--hot)}
+  .lot[aria-pressed="true"]{border-color:var(--volt);box-shadow:0 0 0 2px rgba(255,229,0,.2)}
+  .lot .top{height:130px;position:relative;overflow:hidden;background:radial-gradient(100% 80% at 50% 10%,#262640,#111119)}
+  .lot .top svg{position:absolute;inset:-26% 0 0;width:100%;height:158%}
+  .lot .no{position:absolute;top:10px;left:12px;font-family:"Anton",sans-serif;font-size:2rem;color:var(--hot);opacity:.9}
+  .lot .bd{padding:14px 16px 18px}
+  .lot .nm{font-family:"Anton",sans-serif;font-size:1.25rem}
+  .lot .mt{font-size:.76rem;color:var(--dim);margin-top:3px}
+  .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+  .pill{font-size:.62rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border-radius:999px;
+    border:1px solid var(--line);color:var(--dim)}
+  .pill.live{border-color:var(--hot);color:var(--hot)}
+  .pill.pot{border-color:var(--volt);color:var(--volt)}
+
+  /* ---------- leaderboard ---------- */
+  .board{border:1px solid var(--line);border-radius:16px;background:var(--asphalt);overflow:hidden;margin-top:26px}
+  .board .r{display:flex;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid rgba(46,46,66,.6)}
+  .board .r:last-child{border-bottom:0}
+  .board .pos{font-family:"Anton",sans-serif;font-size:1.3rem;width:34px;color:var(--dim)}
+  .board .r:nth-child(1) .pos{color:var(--volt)}
+  .board .r:nth-child(2) .pos{color:var(--cyan)}
+  .board .r:nth-child(3) .pos{color:var(--hot)}
+  .board .bn{flex:1;font-weight:800}
+  .board .bn small{display:block;font-weight:400;color:var(--dim);font-size:.74rem}
+  .board .sp{font-family:"Anton",sans-serif;font-size:1.2rem;font-variant-numeric:tabular-nums}
+
+  section{padding:56px 0}
+  .sechead{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .sechead h2{font-size:clamp(2rem,4.4vw,3.2rem)}
+  .sechead p{color:var(--dim);max-width:40ch;margin:0;font-size:.92rem}
+
+  .siren{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;max-width:min(94vw,520px);
+    padding:15px 24px;border-radius:12px;background:var(--hot);color:var(--track);
+    font-family:"Anton",sans-serif;font-size:1.05rem;letter-spacing:.04em;text-transform:uppercase;text-align:center;
+    box-shadow:0 10px 40px rgba(255,45,126,.4);animation:pop .35s cubic-bezier(.2,1.5,.4,1)}
+  .siren.good{background:var(--green)}
+  .siren.info{background:var(--volt)}
+  @keyframes pop{from{opacity:0;transform:translate(-50%,20px) scale(.9)}}
+
+  footer{padding:46px 0 70px;text-align:center;color:var(--dim);font-size:.82rem}
+  footer .big{font-family:"Anton",sans-serif;font-size:1.8rem;color:var(--chalk);text-transform:uppercase}
+</style>
+
+<div class="checkers"></div>
+<div class="livebar">
+  <span class="dotlive"></span><span>Live now</span>
+  <span><span class="k">On the table</span> <b id="lb-pot">$0</b></span>
+  <span><span class="k">Bids today</span> <b id="lb-bids">0</b></span>
+  <span><span class="k">Lots running</span> <b id="lb-lots">0</b></span>
+  <span><span class="k">Next hammer</span> <b id="lb-next" class="num">—</b></span>
+</div>
+
+<div class="nav">
+  <div class="logo">AISLE<em>500</em></div>
+  <nav class="navlinks">
+    <button data-goto="floor">Auction floor</button>
+    <button data-goto="lots">The grid</button>
+    <button data-goto="board">Leaderboard</button>
+  </nav>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <h1><span class="skew">The bride</span><br><span class="l2 skew">is the track.</span></h1>
+    <div class="stripes"><i></i><i></i><i></i></div>
+    <p class="tag">Six sponsor panels. One gown. The clock runs down and brands keep raising each other until the hammer drops. <b>Last bid buys the bar.</b></p>
+    <div class="roles" role="tablist" aria-label="Pick a side">
+      <button role="tab" id="tab-couple" aria-selected="false" aria-controls="floor">I'm getting married</button>
+      <button role="tab" id="tab-brand" aria-selected="true" aria-controls="floor">I'm a brand — let me bid</button>
+    </div>
+  </header>
+
+  <section id="floor" style="padding-top:10px">
+    <div class="floor">
+
+      <!-- LEFT: control panel -->
+      <div>
+        <!-- brand controls -->
+        <div class="card" id="brand-card">
+          <h3>Your bid</h3>
+          <p class="sub" id="brand-sub-line">Tap a panel on the gown to get in the fight.</p>
+
+          <div class="fld"><label class="lbl" for="brand-name">Brand name</label>
+            <input class="inp" type="text" id="brand-name" value="Caffeina"></div>
+          <div class="fld"><label class="lbl" for="brand-tag">Tagline on the mark</label>
+            <input class="inp" type="text" id="brand-tag" value="Third wave, first dance"></div>
+
+          <div id="bid-ui" hidden>
+            <div class="clock" id="clock"><span class="t">—</span><span class="c">to the hammer</span></div>
+            <div class="bigprice"><span id="cur-price">$0</span><small id="cur-label">Current lead</small></div>
+            <div class="chips">
+              <button data-inc="100">+100</button>
+              <button data-inc="500">+500</button>
+              <button data-inc="1000">+1K</button>
+              <button class="max" id="chip-max">TOP IT</button>
+            </div>
+            <div class="fld"><label class="lbl" for="bid-amt">Your bid</label>
+              <input class="inp num" type="number" id="bid-amt" step="50"></div>
+            <button class="smash" id="smash">Slam the bid</button>
+            <button class="ghostbtn" id="autobid">Auto-bid me to <span id="auto-cap" class="num">$8,000</span></button>
+          </div>
+        </div>
+
+        <!-- couple controls -->
+        <div class="card" id="couple-card" hidden style="margin-top:16px">
+          <h3>Start your race</h3>
+          <p class="sub" id="couple-sub-line">Tap a panel, set the floor price, choose how long it runs, then lights out.</p>
+
+          <div id="setup-ui" hidden>
+            <div class="fld"><label class="lbl" for="pname">Panel</label>
+              <input class="inp" type="text" id="pname" value="Bodice"></div>
+            <div class="fld"><label class="lbl" for="reserve">Floor price — <span id="reserve-out" class="num">$1,800</span></label>
+              <input type="range" id="reserve" min="100" max="8000" step="100" value="1800"></div>
+            <div class="fld"><label class="lbl" for="window">Hammer drops in</label>
+              <select class="inp" id="window">
+                <option value="60">60 seconds</option>
+                <option value="120" selected>2 minutes</option>
+                <option value="300">5 minutes</option>
+              </select></div>
+            <button class="smash" id="golive">Lights out</button>
+            <button class="ghostbtn" id="pullit">Pull this panel</button>
+            <button class="ghostbtn" id="hammer">Drop the hammer now</button>
+          </div>
+          <button class="ghostbtn upload" style="margin-top:14px">Upload my own dress photo
+            <input type="file" id="photo" accept="image/*" aria-label="Upload a photo of the dress"></button>
+        </div>
+      </div>
+
+      <!-- CENTER: the gown -->
+      <div class="stagewrap">
+        <div class="stagehead">
+          <span id="stage-name">Lot 01 · <b>Maya &amp; Tal</b></span>
+          <span id="stage-state">3 lots running</span>
+        </div>
+        <div class="canvas" id="canvas">
+          <canvas id="confetti"></canvas>
+        </div>
+      </div>
+
+      <!-- RIGHT: ticker -->
+      <div>
+        <div class="tickerbox">
+          <div class="tickerhead"><span class="dotlive"></span>Bid ticker</div>
+          <ul class="feed" id="feed"></ul>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h3 style="font-size:1rem">This lot</h3>
+          <div id="lot-summary" style="font-size:.86rem;color:var(--dim)"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="lots">
+    <div class="sechead">
+      <h2>The grid</h2>
+      <p>Every wedding on the card tonight. Pick one to put it on the floor.</p>
+    </div>
+    <div class="grid" id="lot-grid"></div>
+  </section>
+
+  <section id="board">
+    <div class="sechead">
+      <h2>Leaderboard</h2>
+      <p>Who's actually spending. Updated every time somebody slams a bid.</p>
+    </div>
+    <div class="board" id="board-list"></div>
+  </section>
+
+  <footer>
+    <div class="checkers" style="margin-bottom:26px;border-radius:6px"></div>
+    <div class="big">Aisle 500</div>
+    <div>Sponsor auctions for weddings · Concept demo</div>
+    <div style="margin-top:12px;opacity:.65;font-size:.72rem">Every brand, couple and bid on this page is invented for the demo.</div>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const money = n => "$" + Math.round(n).toLocaleString("en-US");
+  const kmoney = n => n >= 1000 ? "$" + (n/1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/,"") + "K" : "$" + n;
+
+  /* ---------- gown ---------- */
+  function gownSVG(){
+    return `<svg class="gown" viewBox="0 0 400 660" preserveAspectRatio="xMidYMid slice" aria-label="Illustration of a bride in a gown">
+      <defs><linearGradient id="bd" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--dress)"/><stop offset="1" stop-color="var(--dress-shade)"/></linearGradient></defs>
+      <path d="M200 64C122 64 100 152 108 300c8 130-6 224-30 306h244c-24-82-38-176-30-306 8-148-14-236-92-236z" fill="var(--dress)" opacity=".13"/>
+      <path d="M200 252c46 0 64 52 88 154s46 168 60 208c-46 22-108 32-148 32s-102-10-148-32c14-40 36-106 60-208s42-154 88-154z" fill="url(#bd)"/>
+      <path d="M200 142c33 0 51 15 55 38 5 31-3 62-9 90-14-10-29-15-46-15s-32 5-46 15c-6-28-14-59-9-90 4-23 22-38 55-38z" fill="url(#bd)"/>
+      <path d="M200 250c-18 0-34 5-48 16l10 34c12-8 24-12 38-12s26 4 38 12l10-34c-14-11-30-16-48-16z" fill="var(--dress-shade)" opacity=".55"/>
+      <rect x="188" y="116" width="24" height="34" rx="11" fill="var(--skin)"/>
+      <circle cx="200" cy="94" r="33" fill="var(--skin)"/>
+      <path d="M167 88c-2-30 20-42 33-42s35 12 33 42c-4-16-14-24-33-24s-29 8-33 24z" fill="#33232C"/>
+      <path d="M162 168c-16 22-22 56-18 88l12-3c-3-28 3-56 16-74z" fill="url(#bd)"/>
+      <path d="M238 168c16 22 22 56 18 88l-12-3c3-28-3-56-16-74z" fill="url(#bd)"/>
+      <g opacity=".95"><circle cx="200" cy="318" r="17" fill="#FF7FB0"/><circle cx="180" cy="326" r="13" fill="#FFA8C8"/>
+      <circle cx="219" cy="327" r="13" fill="#FFA8C8"/><circle cx="191" cy="304" r="11" fill="#FFD0E1"/>
+      <circle cx="210" cy="305" r="11" fill="#FFD0E1"/><path d="M197 332h6l-2 34h-3z" fill="#2BE08A"/></g>
+    </svg>`;
+  }
+
+  /* ---------- geometry ---------- */
+  const GEO = [
+    {id:"veil",  name:"Veil",       x:50, y:15, w:106, h:30},
+    {id:"bodice",name:"Bodice",     x:50, y:31, w:94,  h:40},
+    {id:"sash",  name:"Sash",       x:50, y:41, w:112, h:24},
+    {id:"left",  name:"Left skirt", x:35, y:63, w:96,  h:44},
+    {id:"right", name:"Right skirt",x:65, y:63, w:96,  h:44},
+    {id:"hem",   name:"Train",      x:50, y:88, w:152, h:34}
+  ];
+
+  const RIVALS = [
+    ["Velour","Glow then cry"],["Halcyon","Stay a while"],["Truss","Built for the aisle"],
+    ["Byte & Bloom","Flowers that text back"],["Orbit","Rides home"],["Nimbus Air","Honeymoon sorted"],
+    ["Pemberton","Joint accounts, easy"],["Ferrous","Forged not printed"],["Tallow","Candles obviously"],
+    ["Grindhaus","Beans at dawn"],["Mellowfield","Mattress money"],["Kite Insurance","For the drone shot"]
+  ];
+
+  function panels(cfg){
+    return GEO.map(g => {
+      const c = cfg[g.id] || {};
+      return {...g, name:c.name||g.name, reserve:c.reserve||1000,
+        st:c.st||"held", closesAt:c.run ? Date.now()+c.run*1000 : null,
+        bids:(c.bids||[]).map(b => ({brand:b[0],tag:b[1],amt:b[2],t:Date.now(),mine:false})),
+        winner:c.winner||null};
+    });
+  }
+
+  const LOTS = [
+    {no:"01", names:"Maya & Tal", meta:"14 Jun · Tel Aviv · 180 guests",
+     cfg:{bodice:{reserve:2400,st:"live",run:150,bids:[["Velour","Glow then cry",2400],["Grindhaus","Beans at dawn",2900]]},
+          sash:{reserve:1600,st:"live",run:200,bids:[["Tallow","Candles obviously",1600]]},
+          hem:{reserve:3200,st:"live",run:260,bids:[]},
+          veil:{reserve:900},left:{reserve:1200},right:{reserve:1200}}},
+    {no:"02", names:"June & Rosa", meta:"2 Aug · Lisbon · 90 guests · livestreamed",
+     cfg:{veil:{reserve:1100,st:"live",run:170,bids:[["Nimbus Air","Honeymoon sorted",1100],["Orbit","Rides home",1450],["Nimbus Air","Honeymoon sorted",1800]]},
+          left:{reserve:950,st:"live",run:130,bids:[]}, right:{reserve:950,st:"live",run:145,bids:[]},
+          bodice:{reserve:2600,st:"won",winner:{brand:"Halcyon",tag:"Stay a while",amt:3400}},
+          sash:{reserve:1400},hem:{reserve:2800}}},
+    {no:"03", names:"Adaeze & Kit", meta:"20 Sep · Edinburgh · 240 guests",
+     cfg:{veil:{reserve:1400,st:"live",run:220,bids:[["Ferrous","Forged not printed",1400]]},
+          bodice:{reserve:3600,st:"live",run:180,bids:[["Pemberton","Joint accounts, easy",3600],["Byte & Bloom","Flowers that text back",4200]]},
+          hem:{reserve:4200,st:"live",run:290,bids:[]}, left:{reserve:1500,st:"live",run:240,bids:[]},
+          sash:{reserve:2000,st:"won",winner:{brand:"Truss",tag:"Built for the aisle",amt:2650}},
+          right:{reserve:1500}}},
+    {no:"04", names:"Priya & Sam", meta:"11 Oct · Goa · 320 guests · three days",
+     cfg:{hem:{reserve:5000,st:"live",run:310,bids:[["Kite Insurance","For the drone shot",5000]]},
+          bodice:{reserve:4400,st:"live",run:200,bids:[]}, veil:{reserve:2200,st:"live",run:260,bids:[]},
+          sash:{reserve:2600},left:{reserve:1800},right:{reserve:1800}}}
+  ];
+  LOTS.forEach(l => l.panels = panels(l.cfg));
+
+  /* ---------- state ---------- */
+  let lot = LOTS[0], sel = null, mode = "brand", photo = null;
+  let bidCount = 318, autoCap = 0, feedItems = [];
+
+  const P = id => lot.panels.find(p => p.id === id);
+  const lead = p => p.bids.length ? p.bids[p.bids.length-1] : null;
+  const minNext = p => { const l = lead(p); return l ? Math.ceil(l.amt*1.07/50)*50 : p.reserve; };
+  const left = p => p.closesAt ? Math.max(0, p.closesAt - Date.now()) : 0;
+  const fmt = ms => ms <= 0 ? "0:00" : Math.floor(ms/60000) + ":" + String(Math.floor(ms/1000)%60).padStart(2,"0");
+
+  /* ---------- siren ---------- */
+  let sirenEl, sirenT;
+  function siren(msg, kind){
+    if(sirenEl) sirenEl.remove();
+    sirenEl = document.createElement("div");
+    sirenEl.className = "siren" + (kind ? " " + kind : "");
+    sirenEl.setAttribute("role","status");
+    sirenEl.textContent = msg;
+    document.body.appendChild(sirenEl);
+    clearTimeout(sirenT);
+    sirenT = setTimeout(() => { sirenEl && sirenEl.remove(); sirenEl = null; }, 3400);
+  }
+
+  /* ---------- confetti ---------- */
+  const cv = $("confetti"), cx = cv.getContext("2d");
+  let parts = [], raf = null;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function burst(){
+    if(reduced) return;
+    const r = cv.getBoundingClientRect();
+    cv.width = r.width; cv.height = r.height;
+    const cols = ["#FF2D7E","#FFE500","#00E1FF","#2BE08A","#F4F3FA"];
+    for(let i=0;i<130;i++)
+      parts.push({x:r.width/2, y:r.height*0.55, vx:(Math.random()-.5)*11, vy:-Math.random()*11-3,
+        s:3+Math.random()*5, c:cols[i%cols.length], rot:Math.random()*6, vr:(Math.random()-.5)*.3, life:1});
+    if(!raf) raf = requestAnimationFrame(step);
+  }
+  function step(){
+    cx.clearRect(0,0,cv.width,cv.height);
+    parts = parts.filter(p => p.life > 0);
+    parts.forEach(p => {
+      p.vy += .28; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life -= .009;
+      cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot); cx.globalAlpha = Math.max(0,p.life);
+      cx.fillStyle = p.c; cx.fillRect(-p.s/2,-p.s/2,p.s,p.s*1.6); cx.restore();
+    });
+    if(parts.length) raf = requestAnimationFrame(step); else { raf = null; cx.clearRect(0,0,cv.width,cv.height); }
+  }
+
+  /* ---------- render gown ---------- */
+  function draw(){
+    const c = $("canvas");
+    const prev = {};
+    c.querySelectorAll(".pod").forEach(p => prev[p.dataset.id] = p.dataset.v || "");
+    [...c.children].forEach(ch => { if(ch.id !== "confetti") ch.remove(); });
+
+    if(photo){
+      const img = document.createElement("img");
+      img.src = photo; img.alt = "Uploaded dress"; c.prepend(img);
+    } else c.insertAdjacentHTML("afterbegin", gownSVG());
+
+    lot.panels.forEach(p => {
+      if(mode === "brand" && p.st === "held") return;
+      const b = document.createElement("button");
+      b.className = "pod";
+      b.style.left = p.x + "%"; b.style.top = p.y + "%";
+      b.style.setProperty("--w", p.w + "px"); b.style.setProperty("--h", p.h + "px");
+      b.dataset.id = p.id;
+      if(sel === p.id) b.dataset.sel = "1";
+
+      if(p.st === "won" && p.winner){
+        b.dataset.st = "won"; b.dataset.v = "won";
+        b.innerHTML = `<span class="brandmark"><span class="b1">${p.winner.brand}</span><span class="b2">${p.winner.tag || money(p.winner.amt)}</span></span>`;
+        if(prev[p.id] !== "won") b.classList.add("land");
+        b.setAttribute("aria-label", p.name + " won by " + p.winner.brand);
+      } else if(p.st === "live"){
+        const l = lead(p), amt = l ? l.amt : p.reserve, t = left(p);
+        b.dataset.st = t < 30000 ? "hot" : "live";
+        b.dataset.v = String(amt);
+        b.innerHTML = `<span class="nm">${p.name}</span><span class="pr">${kmoney(amt)}</span><span class="tm">${fmt(t)}${l ? " · " + p.bids.length : ""}</span>`;
+        if(prev[p.id] && prev[p.id] !== "won" && prev[p.id] !== String(amt)) b.classList.add("bump");
+        b.addEventListener("click", () => select(p.id));
+      } else {
+        b.dataset.st = "held"; b.dataset.v = "held";
+        b.innerHTML = `<span class="nm">${p.name}</span><span class="pr" style="font-size:.62rem">not up</span>`;
+        b.addEventListener("click", () => select(p.id));
+      }
+      c.appendChild(b);
+    });
+    $("stage-state").textContent = lot.panels.filter(p => p.st === "live").length + " lots running";
+    lotSummary();
+  }
+
+  function lotSummary(){
+    const live = lot.panels.filter(p => p.st === "live");
+    const won = lot.panels.filter(p => p.st === "won");
+    const pot = lot.panels.reduce((s,p) => s + (p.winner ? p.winner.amt : (lead(p) ? lead(p).amt : 0)), 0);
+    $("lot-summary").innerHTML =
+      `<div style="display:flex;justify-content:space-between;padding:3px 0"><span>Raised so far</span><b class="num" style="color:var(--volt)">${money(pot)}</b></div>
+       <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Panels running</span><b>${live.length}</b></div>
+       <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Panels sold</span><b>${won.length}</b></div>
+       <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Total bids</span><b>${lot.panels.reduce((s,p)=>s+p.bids.length,0)}</b></div>`;
+  }
+
+  function select(id){
+    sel = id;
+    const p = P(id);
+    if(mode === "brand"){
+      $("bid-ui").hidden = p.st === "held";
+      $("brand-sub-line").textContent = p.st === "held" ? "That panel isn't up for auction." : "Bidding on the " + p.name.toLowerCase() + ".";
+      syncBid(true);
+    } else {
+      $("setup-ui").hidden = false;
+      $("pname").value = p.name;
+      $("reserve").value = Math.min(8000, Math.max(100, p.reserve));
+      $("reserve-out").textContent = money(p.reserve);
+      const held = p.st === "held";
+      $("reserve").disabled = !held; $("window").disabled = !held; $("golive").disabled = !held;
+      $("golive").textContent = held ? "Lights out" : (p.st === "live" ? "Running…" : "Sold");
+      $("hammer").disabled = p.st !== "live";
+      $("pullit").disabled = p.st !== "held" && p.st !== "live";
+      $("couple-sub-line").textContent = p.st === "live"
+        ? "Running. " + p.bids.length + " bids, leader " + (lead(p) ? money(lead(p).amt) : "none") + "."
+        : p.st === "won" ? p.winner.brand + " took it for " + money(p.winner.amt) + "."
+        : "Set the floor price and how long it runs.";
+    }
+    draw();
+  }
+
+  function syncBid(refill){
+    const p = P(sel); if(!p) return;
+    const l = lead(p), min = minNext(p);
+    $("cur-price").textContent = money(l ? l.amt : p.reserve);
+    $("cur-label").textContent = p.st === "won" ? "Sold to " + p.winner.brand
+      : l ? "Leader: " + l.brand + (l.mine ? " (you)" : "") : "Floor price — no bids yet";
+    if(refill || +$("bid-amt").value < min) $("bid-amt").value = min;
+    $("bid-amt").min = min;
+    $("auto-cap").textContent = money(Math.max(min*2, 8000));
+    const dead = p.st !== "live";
+    $("smash").disabled = dead; $("autobid").disabled = dead;
+    $("smash").textContent = dead ? "Hammer down" : "Slam the bid";
+    paintClock();
+  }
+
+  function paintClock(){
+    const el = $("clock"), p = P(sel); if(!p) return;
+    el.className = "clock";
+    const t = el.querySelector(".t"), c = el.querySelector(".c");
+    if(p.st === "won"){ el.classList.add("done"); t.textContent = "SOLD"; c.innerHTML = p.winner.brand + "<br>" + money(p.winner.amt); return; }
+    if(p.st === "held"){ t.textContent = "—"; c.textContent = "not running"; return; }
+    const ms = left(p);
+    t.textContent = fmt(ms);
+    c.innerHTML = ms < 30000 ? "Final seconds<br>a bid adds 30s" : "to the hammer";
+    if(ms < 30000) el.classList.add("urgent");
+  }
+
+  /* ---------- placing bids ---------- */
+  function placeBid(amt, brand, tag, mine){
+    const p = P(sel); if(!p || p.st !== "live") return false;
+    const min = minNext(p);
+    if(amt < min){ siren("Minimum is " + money(min), "info"); $("bid-amt").value = min; return false; }
+    p.bids.push({brand, tag, amt, t:Date.now(), mine});
+    bidCount++;
+    if(left(p) < 30000){ p.closesAt = Date.now() + 30000; siren("Late bid — 30 seconds back on the clock"); }
+    pushFeed(lot, p, {brand, amt, mine});
+    syncBid(true); draw(); board();
+    return true;
+  }
+
+  $("smash").addEventListener("click", () => {
+    const ok = placeBid(+$("bid-amt").value, ($("brand-name").value||"Your brand").trim(),
+      ($("brand-tag").value||"").trim(), true);
+    if(ok) siren("You're leading at " + money(+$("bid-amt").value), "good");
+  });
+  document.querySelectorAll("[data-inc]").forEach(b =>
+    b.addEventListener("click", () => { $("bid-amt").value = (+$("bid-amt").value||0) + (+b.dataset.inc); }));
+  $("chip-max").addEventListener("click", () => {
+    const p = P(sel); if(!p) return;
+    $("bid-amt").value = Math.ceil(minNext(p)*1.35/50)*50;
+  });
+  $("autobid").addEventListener("click", () => {
+    const p = P(sel); if(!p || p.st !== "live") return;
+    autoCap = Math.max(minNext(p)*2, 8000);
+    siren("Auto-bid armed up to " + money(autoCap), "good");
+    $("autobid").textContent = "Auto-bid ON · cap " + money(autoCap);
+  });
+
+  /* ---------- couple setup ---------- */
+  $("reserve").addEventListener("input", () => {
+    $("reserve-out").textContent = money(+$("reserve").value);
+    const p = P(sel); if(p && p.st === "held"){ p.reserve = +$("reserve").value; draw(); }
+  });
+  $("pname").addEventListener("input", () => {
+    const p = P(sel); if(p){ p.name = $("pname").value || "Panel"; draw(); }
+  });
+  $("golive").addEventListener("click", () => {
+    const p = P(sel); if(!p || p.st !== "held") return;
+    lightsOut(() => {
+      p.st = "live"; p.bids = []; p.closesAt = Date.now() + (+$("window").value)*1000;
+      siren(p.name + " is live — " + fmt(left(p)) + " on the clock", "good");
+      select(p.id); board();
+    });
+  });
+  $("pullit").addEventListener("click", () => {
+    const p = P(sel); if(!p) return;
+    p.st = "held"; p.bids = []; p.closesAt = null; p.winner = null;
+    siren(p.name + " pulled from the auction", "info");
+    select(p.id); board();
+  });
+  $("hammer").addEventListener("click", () => {
+    const p = P(sel); if(!p || p.st !== "live") return;
+    p.closesAt = Date.now() + 600;
+    siren("Hammer dropping on the " + p.name.toLowerCase() + "…");
+  });
+  $("photo").addEventListener("change", e => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ev => { photo = ev.target.result; draw(); siren("Your dress is on the floor", "good"); };
+    r.readAsDataURL(f);
+  });
+
+  function lightsOut(done){
+    const o = document.createElement("div");
+    o.className = "lights";
+    o.innerHTML = `<div><div class="row">${"<i></i>".repeat(5)}</div><p>Lights out in…</p></div>`;
+    $("canvas").appendChild(o);
+    const bulbs = [...o.querySelectorAll("i")];
+    let i = 0;
+    const iv = setInterval(() => {
+      if(i < 5){ bulbs[i].classList.add("on"); i++; return; }
+      clearInterval(iv);
+      setTimeout(() => {
+        bulbs.forEach(b => { b.classList.remove("on"); b.classList.add("go"); });
+        o.querySelector("p").textContent = "Bidding open!";
+        setTimeout(() => { o.remove(); done(); }, 620);
+      }, 420);
+    }, 260);
+  }
+
+  /* ---------- ticker ---------- */
+  function pushFeed(L, p, b, won){
+    feedItems.unshift({lot:L.no, names:L.names, zone:p.name, brand:b.brand, amt:b.amt, mine:b.mine, won:!!won});
+    feedItems = feedItems.slice(0, 40);
+    renderFeed();
+  }
+  function renderFeed(){
+    $("feed").innerHTML = feedItems.map(f =>
+      `<li class="${f.mine ? "me " : ""}${f.won ? "won" : ""}">
+         <span class="w">${f.brand}<br><span class="z">Lot ${f.lot} · ${f.zone}${f.won ? " · SOLD" : ""}</span></span>
+         <span class="a">${money(f.amt)}</span></li>`).join("");
+  }
+
+  /* ---------- rivals ---------- */
+  function rivals(){
+    const live = [];
+    LOTS.forEach(L => L.panels.forEach(p => { if(p.st === "live") live.push({L,p}); }));
+    if(!live.length) return;
+    const {L,p} = live[Math.floor(Math.random()*live.length)];
+    if(Math.random() > .72) return;
+    const l = p.bids.length ? p.bids[p.bids.length-1] : null;
+    if(l && l.amt > p.reserve*3.4) return;
+    const pool = RIVALS.filter(r => !l || r[0] !== l.brand);
+    const r = pool[Math.floor(Math.random()*pool.length)];
+    const min = l ? Math.ceil(l.amt*1.07/50)*50 : p.reserve;
+    const amt = Math.ceil(min*(1+Math.random()*.1)/50)*50;
+    p.bids.push({brand:r[0], tag:r[1], amt, t:Date.now(), mine:false});
+    bidCount++;
+    if(p.closesAt && p.closesAt - Date.now() < 30000) p.closesAt = Date.now() + 30000;
+    pushFeed(L, p, {brand:r[0], amt, mine:false});
+
+    if(L === lot){
+      if(l && l.mine && mode === "brand"){
+        if(autoCap && p.id === sel){
+          const counter = Math.ceil(amt*1.07/50)*50;
+          if(counter <= autoCap){
+            setTimeout(() => {
+              if(p.st !== "live") return;
+              p.bids.push({brand:($("brand-name").value||"You").trim(), tag:$("brand-tag").value, amt:counter, t:Date.now(), mine:true});
+              bidCount++; pushFeed(L,p,{brand:"Auto-bid · " + ($("brand-name").value||"You"), amt:counter, mine:true});
+              siren("Auto-bid answered — you lead at " + money(counter), "good");
+              if(sel === p.id) syncBid(true);
+              draw(); board();
+            }, 750);
+          } else siren("Auto-bid cap hit. " + r[0] + " leads at " + money(amt));
+        } else siren(r[0] + " outbid you — " + money(amt));
+      }
+      if(sel === p.id) syncBid(false);
+      draw();
+    }
+    grid(); board();
+  }
+
+  /* ---------- settle ---------- */
+  function settle(L, p){
+    const l = p.bids.length ? p.bids[p.bids.length-1] : null;
+    if(l){
+      p.st = "won"; p.winner = {brand:l.brand, tag:l.tag, amt:l.amt}; p.closesAt = null;
+      pushFeed(L, p, {brand:l.brand, amt:l.amt, mine:l.mine}, true);
+      if(L === lot){
+        burst();
+        siren((l.mine ? "YOU WON the " : l.brand + " takes the ") + p.name.toLowerCase() + " — " + money(l.amt), "good");
+        if(sel === p.id){ mode === "brand" ? syncBid(false) : select(p.id); }
+      }
+    } else {
+      p.st = "held"; p.closesAt = null;
+      if(L === lot) siren("No bids on the " + p.name.toLowerCase() + ". Back on the shelf.", "info");
+    }
+    draw(); grid(); board();
+  }
+
+  /* ---------- lot grid ---------- */
+  function grid(){
+    const g = $("lot-grid"); g.innerHTML = "";
+    LOTS.forEach(L => {
+      const live = L.panels.filter(p => p.st === "live");
+      const pot = L.panels.reduce((s,p) => s + (p.winner ? p.winner.amt : (p.bids.length ? p.bids[p.bids.length-1].amt : 0)), 0);
+      const soon = live.reduce((m,p) => Math.min(m, p.closesAt || Infinity), Infinity);
+      const b = document.createElement("button");
+      b.className = "lot";
+      b.setAttribute("aria-pressed", String(L === lot));
+      b.innerHTML = `<div class="top"><div class="no">${L.no}</div>${gownSVG()}</div>
+        <div class="bd"><div class="nm">${L.names}</div><div class="mt">${L.meta}</div>
+        <div class="pills">
+          ${live.length ? `<span class="pill live">${live.length} running</span>` : `<span class="pill">closed</span>`}
+          <span class="pill pot num">${money(pot)}</span>
+          ${soon < Infinity ? `<span class="pill num">hammer ${fmt(soon-Date.now())}</span>` : ""}
+        </div></div>`;
+      b.addEventListener("click", () => {
+        lot = L; sel = null;
+        $("stage-name").innerHTML = "Lot " + L.no + " · <b>" + L.names + "</b>";
+        $("bid-ui").hidden = true; $("setup-ui").hidden = true;
+        $("brand-sub-line").textContent = "Tap a panel on the gown to get in the fight.";
+        $("couple-sub-line").textContent = "Tap a panel, set the floor price, choose how long it runs, then lights out.";
+        draw(); grid();
+        $("floor").scrollIntoView({behavior:"smooth", block:"start"});
+      });
+      g.appendChild(b);
+    });
+  }
+
+  /* ---------- leaderboard ---------- */
+  function board(){
+    const tot = {};
+    LOTS.forEach(L => L.panels.forEach(p => {
+      if(p.winner) tot[p.winner.brand] = (tot[p.winner.brand]||0) + p.winner.amt;
+      const l = p.bids.length ? p.bids[p.bids.length-1] : null;
+      if(l && p.st === "live") tot[l.brand] = (tot[l.brand]||0) + l.amt;
+    }));
+    const rows = Object.entries(tot).sort((a,b) => b[1]-a[1]).slice(0,7);
+    $("board-list").innerHTML = rows.length ? rows.map(([b,v],i) =>
+      `<div class="r"><div class="pos">${i+1}</div>
+        <div class="bn">${b}<small>${i===0 ? "top spender tonight" : "leading or won"}</small></div>
+        <div class="sp num">${money(v)}</div></div>`).join("")
+      : `<div class="r"><div class="bn">Nobody has bid yet.</div></div>`;
+
+    const pot = Object.values(tot).reduce((a,b)=>a+b,0);
+    const lots = LOTS.reduce((s,L) => s + L.panels.filter(p=>p.st==="live").length, 0);
+    $("lb-pot").textContent = money(pot);
+    $("lb-bids").textContent = bidCount.toLocaleString("en-US");
+    $("lb-lots").textContent = lots;
+  }
+
+  /* ---------- clocks ---------- */
+  setInterval(() => {
+    LOTS.forEach(L => L.panels.forEach(p => { if(p.st === "live" && left(p) <= 0) settle(L,p); }));
+    let soon = Infinity;
+    LOTS.forEach(L => L.panels.forEach(p => { if(p.st === "live" && p.closesAt) soon = Math.min(soon, p.closesAt); }));
+    $("lb-next").textContent = soon < Infinity ? fmt(soon - Date.now()) : "—";
+    if(sel) { paintClock(); if(mode === "brand") syncBid(false); }
+    draw(); grid();
+  }, 1000);
+  setInterval(rivals, 3400);
+
+  /* ---------- mode ---------- */
+  function setMode(brand){
+    mode = brand ? "brand" : "couple";
+    $("tab-brand").setAttribute("aria-selected", String(brand));
+    $("tab-couple").setAttribute("aria-selected", String(!brand));
+    $("brand-card").hidden = !brand;
+    $("couple-card").hidden = brand;
+    sel = null; $("bid-ui").hidden = true; $("setup-ui").hidden = true;
+    draw();
+  }
+  $("tab-brand").addEventListener("click", () => setMode(true));
+  $("tab-couple").addEventListener("click", () => setMode(false));
+  document.querySelectorAll("[data-goto]").forEach(b =>
+    b.addEventListener("click", () => $(b.dataset.goto).scrollIntoView({behavior:"smooth",block:"start"})));
+
+  /* ---------- seed ---------- */
+  LOTS.forEach(L => L.panels.forEach(p => {
+    p.bids.forEach(b => feedItems.push({lot:L.no,names:L.names,zone:p.name,brand:b.brand,amt:b.amt,mine:false}));
+    if(p.winner) feedItems.push({lot:L.no,names:L.names,zone:p.name,brand:p.winner.brand,amt:p.winner.amt,won:true});
+  }));
+  feedItems = feedItems.reverse().slice(0,40);
+  renderFeed(); grid(); board(); draw();
+})();
+</script>

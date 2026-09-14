@@ -1,0 +1,820 @@
+<title>Something Borrowed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Italiana&family=Karla:ital,wght@0,300..800;1,300..700&display=swap">
+<style>
+  :root{
+    --ground:#ECEFEB; --paper:#FBFBF8; --ink:#23201E; --ink-soft:#6A645E;
+    --hair:#CFD3CC; --bordeaux:#6B2737; --brass:#A2833E; --sage:#7F9376;
+    --skin:#E4C6AE; --dress:#FFFFFF; --dress-shade:#DFE3DD;
+    --shadow:0 1px 2px rgba(35,32,30,.05), 0 12px 32px -18px rgba(35,32,30,.35);
+    --fs-1:clamp(2.8rem,6.6vw,5.4rem); --fs-2:clamp(1.9rem,3.6vw,3rem);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#191C19; --paper:#22261F; --ink:#EDEFE9; --ink-soft:#A3A69C;
+      --hair:#3A3E38; --bordeaux:#D48D9E; --brass:#D8B76B; --sage:#9DB394;
+      --dress:#E9ECE5; --dress-shade:#B9BEB2;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 34px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#191C19; --paper:#22261F; --ink:#EDEFE9; --ink-soft:#A3A69C;
+    --hair:#3A3E38; --bordeaux:#D48D9E; --brass:#D8B76B; --sage:#9DB394;
+    --dress:#E9ECE5; --dress-shade:#B9BEB2;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 34px -18px rgba(0,0,0,.8);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:"Karla",-apple-system,"Segoe UI",sans-serif;font-size:16.5px;line-height:1.62;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1150px;margin:0 auto;padding:0 28px}
+  h1,h2,h3{margin:0;text-wrap:balance;font-weight:400}
+  .display{font-family:"Italiana",Georgia,serif;letter-spacing:.01em;line-height:1.05}
+  .eyebrow{font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;margin:0}
+  .rule{height:1px;background:var(--hair);border:0;margin:0}
+  button{font:inherit;cursor:pointer}
+  :focus-visible{outline:2px solid var(--brass);outline-offset:3px;border-radius:2px}
+  .num{font-variant-numeric:tabular-nums}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 28px;max-width:1150px;margin:0 auto}
+  .mark{display:flex;align-items:baseline;gap:10px}
+  .mark .glyph{font-family:"Italiana",serif;font-size:1.5rem;color:var(--bordeaux)}
+  .mark .name{font-family:"Italiana",serif;font-size:1.22rem;letter-spacing:.06em}
+  .topnav{display:flex;gap:22px;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+  .topnav button{background:none;border:0;color:inherit;letter-spacing:inherit;text-transform:inherit;font-size:inherit;padding:0}
+  .topnav button:hover{color:var(--bordeaux)}
+  @media(max-width:720px){.topnav{display:none}}
+
+  .hero{padding:52px 0 66px;text-align:center}
+  .hero h1{font-size:var(--fs-1)}
+  .hero .sub{margin:26px auto 0;max-width:53ch;font-size:1.1rem;color:var(--ink-soft)}
+  .hero .sub em{font-style:italic;color:var(--ink)}
+  .ornament{display:flex;align-items:center;justify-content:center;gap:14px;margin:30px 0 4px;color:var(--brass)}
+  .ornament span{height:1px;width:min(120px,18vw);background:currentColor;opacity:.5}
+  .ornament svg{width:16px;height:16px}
+  .ledger{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--hair);border:1px solid var(--hair);margin-top:50px}
+  .ledger div{background:var(--paper);padding:22px 18px;text-align:center}
+  .ledger .n{font-family:"Italiana",serif;font-size:2.1rem;color:var(--bordeaux);line-height:1.1}
+  .ledger .l{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin-top:6px}
+  @media(max-width:620px){.ledger{grid-template-columns:1fr}}
+
+  section{padding:74px 0}
+  .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+  .sec-head h2{font-size:var(--fs-2)}
+  .sec-note{max-width:42ch;color:var(--ink-soft);font-size:.95rem}
+
+  .roles{display:flex;border:1px solid var(--hair);width:fit-content;margin:34px auto 0;background:var(--paper)}
+  .roles button{background:none;border:0;padding:13px 26px;color:var(--ink-soft);
+    font-size:.76rem;letter-spacing:.16em;text-transform:uppercase;transition:background .25s,color .25s}
+  .roles button[aria-selected="true"]{background:var(--ink);color:var(--ground)}
+
+  .atelier{display:grid;grid-template-columns:minmax(0,1fr) 392px;gap:38px;margin-top:38px;align-items:start}
+  @media(max-width:940px){.atelier{grid-template-columns:1fr}}
+
+  .stage{position:relative;background:var(--paper);border:1px solid var(--hair);padding:20px;box-shadow:var(--shadow)}
+  .stage-label{display:flex;justify-content:space-between;align-items:center;gap:12px;
+    font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:14px}
+  .canvas{position:relative;width:100%;aspect-ratio:2/3;overflow:hidden;background:linear-gradient(170deg,var(--ground),var(--paper))}
+  .canvas img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .canvas svg{position:absolute;inset:0;width:100%;height:100%}
+
+  .zone{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;
+    border:1px dashed var(--bordeaux);border-radius:2px;
+    background:color-mix(in srgb,var(--bordeaux) 8%,transparent);
+    color:var(--bordeaux);cursor:pointer;padding:2px 4px;line-height:1.25;
+    transition:background .2s,transform .2s,box-shadow .2s,border-color .2s;
+    width:var(--w);height:var(--h)}
+  .zone:hover{background:color-mix(in srgb,var(--bordeaux) 18%,transparent);transform:translate(-50%,-50%) scale(1.05);z-index:3}
+  .zone[data-state="selected"]{border-style:solid;box-shadow:0 0 0 4px color-mix(in srgb,var(--bordeaux) 14%,transparent);z-index:2}
+  .zone[data-state="held"]{border-color:var(--hair);color:var(--ink-soft);background:transparent}
+  .zone[data-state="sold"]{border:1px solid var(--brass);background:var(--paper);cursor:default}
+  .zone .ztag{font-size:.54rem;letter-spacing:.11em;text-transform:uppercase;white-space:nowrap;pointer-events:none;text-align:center}
+  .zone .price{font-size:.66rem;font-weight:800;letter-spacing:.02em}
+  .zone .tick{font-size:.5rem;letter-spacing:.06em;opacity:.75}
+  .logo-lockup{display:flex;flex-direction:column;align-items:center;gap:1px;color:var(--ink);pointer-events:none;text-align:center}
+  .logo-lockup .lg{font-size:.6rem;letter-spacing:.19em;font-weight:800;text-transform:uppercase;white-space:nowrap}
+  .logo-lockup .sm{font-size:.42rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);white-space:nowrap}
+  .pop{animation:pop .55s cubic-bezier(.2,1.5,.4,1)}
+  @keyframes pop{from{opacity:0;transform:translate(-50%,-50%) scale(.55)}}
+  .bump{animation:bump .5s ease}
+  @keyframes bump{30%{transform:translate(-50%,-50%) scale(1.13)}}
+  @media(prefers-reduced-motion:reduce){.pop,.bump{animation:none}}
+
+  .panel{background:var(--paper);border:1px solid var(--hair);padding:24px;box-shadow:var(--shadow)}
+  .panel h3{font-family:"Italiana",serif;font-size:1.55rem;margin-bottom:3px}
+  .hint{font-size:.86rem;color:var(--ink-soft);margin:0 0 18px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px}
+  .field input[type="text"],.field input[type="number"],.field select{
+    width:100%;padding:10px 12px;background:transparent;color:var(--ink);border:1px solid var(--hair);font:inherit;font-size:.95rem}
+  .field input[type="range"]{width:100%;accent-color:var(--bordeaux)}
+  .amount{font-family:"Italiana",serif;font-size:2.3rem;color:var(--bordeaux);line-height:1}
+  .amount small{font-family:"Karla",sans-serif;font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-top:6px}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;width:100%;padding:13px 18px;
+    border:1px solid var(--ink);background:var(--ink);color:var(--ground);
+    font-size:.74rem;letter-spacing:.17em;text-transform:uppercase;transition:opacity .2s,transform .15s}
+  .btn:hover{opacity:.86}
+  .btn:active{transform:translateY(1px)}
+  .btn.ghost{background:transparent;color:var(--ink);border-color:var(--hair)}
+  .btn.ghost:hover{border-color:var(--ink)}
+  .btn.small{padding:8px 12px;font-size:.64rem;width:auto}
+  .btn[disabled]{opacity:.38;cursor:not-allowed}
+  .btn-row{display:flex;gap:10px}
+  .upload{position:relative;overflow:hidden}
+  .upload input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+  /* countdown */
+  .clock{display:flex;align-items:baseline;gap:10px;border:1px solid var(--brass);
+    padding:12px 14px;margin-bottom:18px;background:color-mix(in srgb,var(--brass) 7%,transparent)}
+  .clock .t{font-family:"Italiana",serif;font-size:1.9rem;color:var(--brass);line-height:1}
+  .clock .c{font-size:.66rem;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-soft)}
+  .clock.urgent{border-color:var(--bordeaux);background:color-mix(in srgb,var(--bordeaux) 9%,transparent)}
+  .clock.urgent .t{color:var(--bordeaux);animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.5}}
+  @media(prefers-reduced-motion:reduce){.clock.urgent .t{animation:none}}
+  .clock.closed{border-color:var(--sage);background:color-mix(in srgb,var(--sage) 10%,transparent)}
+  .clock.closed .t{color:var(--sage);font-size:1.3rem;animation:none}
+
+  /* bid ledger */
+  .bids{list-style:none;margin:0;padding:0;max-height:212px;overflow-y:auto}
+  .bids li{display:flex;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid var(--hair);font-size:.88rem;
+    animation:slide .4s ease both}
+  @keyframes slide{from{opacity:0;transform:translateY(-7px)}}
+  @media(prefers-reduced-motion:reduce){.bids li{animation:none}}
+  .bids .who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bids .amt{font-weight:700;font-variant-numeric:tabular-nums}
+  .bids .when{font-size:.7rem;color:var(--ink-soft);white-space:nowrap}
+  .bids li.lead .amt{color:var(--bordeaux)}
+  .bids li.mine .who::after{content:" · you";color:var(--brass);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase}
+  .bids li.out{opacity:.5}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:60;
+    background:var(--ink);color:var(--ground);padding:13px 22px;box-shadow:var(--shadow);
+    font-size:.82rem;letter-spacing:.05em;max-width:min(92vw,460px);text-align:center;
+    animation:toast .4s cubic-bezier(.2,1.3,.4,1)}
+  .toast.alert{background:var(--bordeaux)}
+  .toast.win{background:var(--sage)}
+  @keyframes toast{from{opacity:0;transform:translate(-50%,18px)}}
+
+  .tally{border-top:1px solid var(--hair);margin-top:20px;padding-top:14px}
+  .tally-row{display:flex;justify-content:space-between;gap:12px;font-size:.86rem;padding:5px 0;color:var(--ink-soft)}
+  .tally-row b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+  .tally-row .up{color:var(--sage);font-size:.7rem;letter-spacing:.08em}
+  .tally-total{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--hair);margin-top:10px;padding-top:12px}
+  .tally-total span{font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-soft)}
+  .tally-total b{font-family:"Italiana",serif;font-size:1.85rem;color:var(--bordeaux);font-weight:400}
+
+  .register{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:22px;margin-top:38px}
+  .couple{background:var(--paper);border:1px solid var(--hair);padding:0;text-align:left;overflow:hidden;
+    transition:transform .25s,box-shadow .25s,border-color .25s}
+  .couple:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:var(--brass)}
+  .couple[aria-pressed="true"]{border-color:var(--bordeaux);box-shadow:var(--shadow)}
+  .couple .thumb{height:136px;background:linear-gradient(160deg,var(--ground),var(--paper));position:relative;border-bottom:1px solid var(--hair);overflow:hidden}
+  .couple .thumb svg{position:absolute;inset:-30% 0 0;width:100%;height:160%}
+  .couple .body{padding:16px 18px 20px}
+  .couple .names{font-family:"Italiana",serif;font-size:1.4rem;line-height:1.15}
+  .couple .meta{font-size:.78rem;color:var(--ink-soft);margin-top:4px}
+  .couple .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .tag{font-size:.59rem;letter-spacing:.11em;text-transform:uppercase;border:1px solid var(--hair);padding:3px 8px;color:var(--ink-soft)}
+  .tag.live{border-color:var(--bordeaux);color:var(--bordeaux)}
+  .tag.hot{border-color:var(--brass);color:var(--brass)}
+
+  .somethings{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--hair);border:1px solid var(--hair);margin-top:36px}
+  .somethings div{background:var(--paper);padding:26px 20px}
+  .somethings .k{font-family:"Italiana",serif;font-size:1.25rem;color:var(--bordeaux)}
+  .somethings .v{font-size:.88rem;color:var(--ink-soft);margin-top:6px}
+  @media(max-width:760px){.somethings{grid-template-columns:1fr 1fr}}
+
+  footer{padding:56px 0 76px;text-align:center;color:var(--ink-soft);font-size:.85rem}
+  footer .display{font-size:1.6rem;color:var(--ink);margin-bottom:10px}
+  .disclaimer{margin-top:16px;font-size:.72rem;opacity:.7}
+</style>
+
+<div class="topbar">
+  <div class="mark"><span class="glyph">❦</span><span class="name">Something&nbsp;Borrowed</span></div>
+  <nav class="topnav">
+    <button data-goto="atelier">The Atelier</button>
+    <button data-goto="register">The Register</button>
+    <button data-goto="etiquette">Etiquette</button>
+  </nav>
+</div>
+<hr class="rule">
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">Bridal placements &middot; Offers close on the date you choose</p>
+    <h1 class="display">Let them<br>bid for the<br>bodice.</h1>
+    <div class="ornament"><span></span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 4 3 6 7 7-4 1-6 3-7 7-1-4-3-6-7-7 4-1 6-3 7-7z"/></svg><span></span></div>
+    <p class="sub">You open a panel of the gown, you set the closing date, and brands raise each other until the clock runs out. <em>You still choose who wins.</em></p>
+    <div class="ledger">
+      <div><div class="n">$38,400</div><div class="l">Average wedding</div></div>
+      <div><div class="n">417</div><div class="l">Photos per guest list</div></div>
+      <div><div class="n">6</div><div class="l">Panels per gown</div></div>
+    </div>
+  </header>
+  <hr class="rule">
+
+  <section id="atelier">
+    <div class="sec-head">
+      <div><p class="eyebrow">The room</p><h2 class="display">The Atelier</h2></div>
+      <p class="sec-note">Put your own gown on the stand, open the panels you're willing to lend, set a closing date, and watch the offers come in.</p>
+    </div>
+
+    <div class="roles" role="tablist" aria-label="Choose a view">
+      <button role="tab" id="tab-bride" aria-selected="true" aria-controls="view-bride">I'm getting married</button>
+      <button role="tab" id="tab-sponsor" aria-selected="false" aria-controls="view-sponsor">I'm a brand</button>
+    </div>
+
+    <!-- ================= BRIDE ================= -->
+    <div class="atelier" id="view-bride" role="tabpanel" aria-labelledby="tab-bride">
+      <div class="stage">
+        <div class="stage-label">
+          <span id="stage-name">Maya &amp; Tal &middot; 14 June</span>
+          <span id="stage-status">3 panels taking offers</span>
+        </div>
+        <div class="canvas" id="canvas-bride"></div>
+      </div>
+
+      <div class="panel">
+        <h3 id="panel-title">Your gown</h3>
+        <p class="hint" id="panel-hint">Tap a panel on the gown to open it, price it, and set the date offers close.</p>
+
+        <div id="panel-editor" hidden>
+          <div class="clock" id="bride-clock"><span class="t">—</span><span class="c">Offers close</span></div>
+          <div class="field">
+            <label for="zname">Panel name</label>
+            <input type="text" id="zname" value="Bodice">
+          </div>
+          <div class="field">
+            <label for="zprice">Opening price &mdash; nobody may bid below this</label>
+            <input type="range" id="zprice" min="150" max="6000" step="50" value="1800">
+            <div class="amount" style="margin-top:12px"><span id="zprice-out">$1,800</span><small id="zprice-ctx">One photographer, second shooter included</small></div>
+          </div>
+          <div class="field">
+            <label for="zwindow">Offers close</label>
+            <select id="zwindow">
+              <option value="60">In 1 minute &mdash; demo speed</option>
+              <option value="120" selected>In 2 minutes &mdash; demo speed</option>
+              <option value="240">In 4 minutes &mdash; demo speed</option>
+            </select>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="open-zone">Open for offers</button>
+            <button class="btn ghost" id="close-zone">Keep it sacred</button>
+          </div>
+          <div id="bride-bidbox" hidden style="margin-top:20px">
+            <p class="eyebrow" style="margin-bottom:8px">Offers on this panel</p>
+            <ul class="bids" id="bride-bids"></ul>
+            <div class="btn-row" style="margin-top:14px">
+              <button class="btn small ghost" id="accept-now">Accept the lead now</button>
+              <button class="btn small ghost" id="skip-clock">Skip to closing</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn ghost upload">Use my own photo<input type="file" id="photo" accept="image/*" aria-label="Upload a photo of the dress"></button>
+        </div>
+
+        <div class="tally">
+          <div id="tally-list"></div>
+          <div class="tally-total"><span>Gown is earning</span><b id="tally-total">$0</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= SPONSOR ================= -->
+    <div class="atelier" id="view-sponsor" role="tabpanel" aria-labelledby="tab-sponsor" hidden>
+      <div class="stage">
+        <div class="stage-label">
+          <span id="sp-stage-name">Maya &amp; Tal &middot; Tel Aviv</span>
+          <span id="sp-stage-status">3 panels taking offers</span>
+        </div>
+        <div class="canvas" id="canvas-sponsor"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Bidding as a brand</h3>
+        <p class="hint">Pick a panel on the gown. Raise the leader before the clock runs out. Other brands are watching too.</p>
+        <div class="field">
+          <label for="brand-pick">Your mark</label>
+          <input type="text" id="brand-pick" value="Fernwood &amp; Co.">
+        </div>
+        <div class="field">
+          <label for="brand-sub">Line beneath the mark</label>
+          <input type="text" id="brand-sub" value="Small-batch gin">
+        </div>
+
+        <div id="sp-empty" class="hint">No panel selected yet.</div>
+
+        <div id="sp-bidbox" hidden>
+          <div class="clock" id="sp-clock"><span class="t">—</span><span class="c">Offers close</span></div>
+          <div class="field">
+            <label for="bid-amt">Your offer &mdash; minimum <span id="min-bid" class="num">$0</span></label>
+            <input type="number" id="bid-amt" step="50" min="0">
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="place-bid">Place the offer</button>
+            <button class="btn ghost small" id="bid-plus">+$250</button>
+          </div>
+          <p class="eyebrow" style="margin:20px 0 8px">The ledger</p>
+          <ul class="bids" id="sp-bids"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section id="register">
+    <div class="sec-head">
+      <div><p class="eyebrow">Open this season</p><h2 class="display">The Register</h2></div>
+      <p class="sec-note">Every gown taking offers right now. Click one to load it onto the stand.</p>
+    </div>
+    <div class="register" id="register-grid"></div>
+  </section>
+
+  <hr class="rule">
+
+  <section id="etiquette">
+    <div class="sec-head">
+      <div><p class="eyebrow">House rules</p><h2 class="display">Etiquette</h2></div>
+      <p class="sec-note">What keeps an auction on a wedding dress charming instead of grim.</p>
+    </div>
+    <div class="somethings">
+      <div><div class="k">Something old</div><div class="v">Highest offer doesn't automatically win. The couple may accept any bidder on the ledger, or none.</div></div>
+      <div><div class="k">Something new</div><div class="v">An offer in the last thirty seconds pushes the clock back thirty seconds. No sniping a wedding.</div></div>
+      <div><div class="k">Something borrowed</div><div class="v">Placements are removable silk appliqué. The gown survives the marketing.</div></div>
+      <div><div class="k">Something blue</div><div class="v">One panel stays unsold. Tradition, and a decent bargaining chip.</div></div>
+    </div>
+  </section>
+
+  <footer>
+    <hr class="rule" style="margin-bottom:38px">
+    <div class="display">Something Borrowed</div>
+    <div>Placements for the modern gown &middot; Concept demo</div>
+    <div class="disclaimer">Every brand, couple, bid and figure on this page is invented for the demo.</div>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const money = n => "$" + Math.round(n).toLocaleString("en-US");
+
+  /* ---------------- gown ---------------- */
+  function gownSVG(){
+    return `<svg viewBox="0 0 400 660" preserveAspectRatio="xMidYMid slice" aria-label="Illustration of a bride in a gown">
+      <defs><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--dress)"/><stop offset="1" stop-color="var(--dress-shade)"/></linearGradient></defs>
+      <path d="M200 64C122 64 100 152 108 300c8 130-6 224-30 306h244c-24-82-38-176-30-306 8-148-14-236-92-236z" fill="var(--dress-shade)" opacity=".28"/>
+      <path d="M200 252c46 0 64 52 88 154s46 168 60 208c-46 22-108 32-148 32s-102-10-148-32c14-40 36-106 60-208s42-154 88-154z" fill="url(#gd)"/>
+      <path d="M200 142c33 0 51 15 55 38 5 31-3 62-9 90-14-10-29-15-46-15s-32 5-46 15c-6-28-14-59-9-90 4-23 22-38 55-38z" fill="url(#gd)"/>
+      <path d="M200 250c-18 0-34 5-48 16l10 34c12-8 24-12 38-12s26 4 38 12l10-34c-14-11-30-16-48-16z" fill="var(--dress-shade)" opacity=".5"/>
+      <rect x="188" y="116" width="24" height="34" rx="11" fill="var(--skin)"/>
+      <circle cx="200" cy="94" r="33" fill="var(--skin)"/>
+      <path d="M167 88c-2-30 20-42 33-42s35 12 33 42c-4-16-14-24-33-24s-29 8-33 24z" fill="#4A3B33"/>
+      <path d="M162 168c-16 22-22 56-18 88l12-3c-3-28 3-56 16-74z" fill="url(#gd)"/>
+      <path d="M238 168c16 22 22 56 18 88l-12-3c3-28-3-56-16-74z" fill="url(#gd)"/>
+      <g opacity=".95"><circle cx="200" cy="318" r="17" fill="#E8DDE6"/><circle cx="180" cy="326" r="13" fill="#F0E6EE"/>
+      <circle cx="219" cy="327" r="13" fill="#F0E6EE"/><circle cx="191" cy="304" r="11" fill="#F5EDF3"/>
+      <circle cx="210" cy="305" r="11" fill="#F5EDF3"/><path d="M197 332h6l-2 34h-3z" fill="var(--sage)"/></g>
+    </svg>`;
+  }
+
+  /* ---------------- data ---------------- */
+  const GEO = [
+    {id:"veil",  name:"Veil edge",     x:50, y:15, w:108, h:30},
+    {id:"bodice",name:"Bodice",        x:50, y:31, w:94,  h:38},
+    {id:"sash",  name:"Waist sash",    x:50, y:41, w:114, h:24},
+    {id:"left",  name:"Left skirt",    x:35, y:63, w:98,  h:42},
+    {id:"right", name:"Right skirt",   x:65, y:63, w:98,  h:42},
+    {id:"hem",   name:"Cathedral hem", x:50, y:88, w:154, h:34}
+  ];
+
+  const RIVALS = [
+    ["Halcyon Hotels","Stay a while"], ["Truss Athletics","Built for the aisle"],
+    ["Caffeina","Third wave, first dance"], ["Byte & Bloom","Flowers that text back"],
+    ["Orbit","Rides home, guaranteed"], ["Velour Skin","Glow, then cry"],
+    ["Pemberton Bank","Joint accounts made easy"], ["Nimbus Air","Honeymoon, sorted"],
+    ["Ferrous Rings","Forged, not printed"], ["Tallow & Wick","Candles, obviously"]
+  ];
+
+  const CTX = [[0,400,"Covers the cake, maybe the stand"],[401,1100,"A florist who returns your calls"],
+    [1101,2200,"One photographer, second shooter included"],[2201,3800,"The band stays for a third set"],
+    [3801,99999,"An open bar nobody apologises for"]];
+  const ctxFor = n => (CTX.find(c => n>=c[0] && n<=c[1]) || CTX[4])[2];
+
+  function makePanels(cfg){
+    return GEO.map(g => {
+      const c = cfg[g.id] || {};
+      return {
+        ...g,
+        name: c.name || g.name,
+        reserve: c.reserve || 800,
+        state: c.state || "held",              // held | live | closed
+        closesAt: c.live ? Date.now() + c.live*1000 : null,
+        bids: (c.bids || []).map((b,i) => ({brand:b[0], sub:b[1], amount:b[2], t:Date.now()-(c.bids.length-i)*90000, mine:false})),
+        winner: c.winner || null
+      };
+    });
+  }
+
+  const COUPLES = [
+    {id:"mt", names:"Maya & Tal", city:"Tel Aviv", when:"14 June", meta:"180 guests", note:"Garden ceremony, string quartet",
+     cfg:{bodice:{reserve:2400,state:"live",live:170,bids:[["Caffeina","Third wave, first dance",2400],["Velour Skin","Glow, then cry",2750]]},
+          sash:{reserve:1600,state:"live",live:210,bids:[["Tallow & Wick","Candles, obviously",1600]]},
+          hem:{reserve:3200,state:"live",live:260,bids:[]},
+          veil:{reserve:900},left:{reserve:1200},right:{reserve:1200}}},
+    {id:"jr", names:"June & Rosa", city:"Lisbon", when:"2 August", meta:"90 guests", note:"Livestreamed to three continents",
+     cfg:{veil:{reserve:1100,state:"live",live:200,bids:[["Nimbus Air","Honeymoon, sorted",1100],["Orbit","Rides home, guaranteed",1350],["Nimbus Air","Honeymoon, sorted",1600]]},
+          left:{reserve:950,state:"live",live:150,bids:[]},
+          right:{reserve:950,state:"live",live:150,bids:[]},
+          bodice:{reserve:2600,state:"closed",winner:{brand:"Halcyon Hotels",sub:"Stay a while",amount:3400}},
+          sash:{reserve:1400},hem:{reserve:2800}}},
+    {id:"ak", names:"Adaeze & Kit", city:"Edinburgh", when:"20 September", meta:"240 guests", note:"Second ceremony in Lagos",
+     cfg:{veil:{reserve:1400,state:"live",live:230,bids:[["Ferrous Rings","Forged, not printed",1400]]},
+          bodice:{reserve:3600,state:"live",live:190,bids:[["Pemberton Bank","Joint accounts made easy",3600],["Byte & Bloom","Flowers that text back",4100]]},
+          hem:{reserve:4200,state:"live",live:280,bids:[]},
+          left:{reserve:1500,state:"live",live:240,bids:[]},
+          sash:{reserve:2000,state:"closed",winner:{brand:"Truss Athletics",sub:"Built for the aisle",amount:2650}},
+          right:{reserve:1500}}}
+  ];
+  COUPLES.forEach(c => c.panels = makePanels(c.cfg));
+
+  /* ---------------- state ---------------- */
+  let active = COUPLES[0];
+  let myPhoto = null, brideSel = null, spSel = null, role = "bride";
+
+  const P = id => active.panels.find(p => p.id === id);
+  const lead = p => p.bids.length ? p.bids[p.bids.length-1] : null;
+  const minNext = p => { const l = lead(p); return l ? Math.ceil((l.amount*1.06)/50)*50 : p.reserve; };
+  const remaining = p => p.closesAt ? Math.max(0, p.closesAt - Date.now()) : 0;
+
+  function fmtClock(ms){
+    if(ms <= 0) return "closed";
+    const s = Math.floor(ms/1000);
+    return String(Math.floor(s/60)) + ":" + String(s%60).padStart(2,"0");
+  }
+
+  /* ---------------- toast ---------------- */
+  let toastEl = null, toastTimer = null;
+  function toast(msg, kind){
+    if(toastEl) toastEl.remove();
+    toastEl = document.createElement("div");
+    toastEl.className = "toast" + (kind ? " " + kind : "");
+    toastEl.setAttribute("role","status");
+    toastEl.innerHTML = msg;
+    document.body.appendChild(toastEl);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { if(toastEl){ toastEl.remove(); toastEl = null; } }, 3800);
+  }
+
+  /* ---------------- canvas ---------------- */
+  function renderCanvas(el, mode){
+    const prev = {};
+    el.querySelectorAll(".zone").forEach(z => prev[z.dataset.id] = z.dataset.amt || "");
+    el.innerHTML = "";
+    if(myPhoto){
+      const img = document.createElement("img");
+      img.src = myPhoto; img.alt = "The uploaded gown";
+      el.appendChild(img);
+    } else el.insertAdjacentHTML("beforeend", gownSVG());
+
+    active.panels.forEach(p => {
+      if(mode === "sponsor" && p.state === "held") return;
+      const b = document.createElement("button");
+      b.className = "zone";
+      b.style.left = p.x + "%"; b.style.top = p.y + "%";
+      b.style.setProperty("--w", p.w + "px"); b.style.setProperty("--h", p.h + "px");
+      b.dataset.id = p.id;
+
+      if(p.state === "closed" && p.winner){
+        b.dataset.state = "sold";
+        b.innerHTML = `<span class="logo-lockup"><span class="lg">${p.winner.brand}</span><span class="sm">${p.winner.sub || money(p.winner.amount)}</span></span>`;
+        b.setAttribute("aria-label", p.name + " — won by " + p.winner.brand);
+        if(prev[p.id] !== "won") b.classList.add("pop");
+        b.dataset.amt = "won";
+      } else if(p.state === "live"){
+        const l = lead(p), amt = l ? l.amount : p.reserve;
+        b.dataset.amt = String(amt);
+        b.innerHTML = `<span class="ztag">${p.name}<br><span class="price">${money(amt)}</span><br><span class="tick">${l ? p.bids.length + " offers · " : "opening · "}${fmtClock(remaining(p))}</span></span>`;
+        if(prev[p.id] && prev[p.id] !== "won" && prev[p.id] !== String(amt)) b.classList.add("bump");
+        const sel = mode === "sponsor" ? spSel : brideSel;
+        if(sel === p.id) b.dataset.state = "selected";
+        b.addEventListener("click", () => pick(p.id, mode));
+      } else {
+        b.dataset.state = "held";
+        b.innerHTML = `<span class="ztag">${p.name}<br><span class="price">held back</span></span>`;
+        if(brideSel === p.id) b.dataset.state = "selected";
+        b.addEventListener("click", () => pick(p.id, mode));
+      }
+      el.appendChild(b);
+    });
+  }
+
+  function pick(id, mode){
+    if(mode === "sponsor"){ spSel = id; drawSponsor(); syncSponsorPanel(true); }
+    else { brideSel = id; openEditor(P(id)); drawBride(); }
+  }
+
+  const drawBride = () => { renderCanvas($("canvas-bride"), "bride"); updateTally(); updateStatus(); };
+  const drawSponsor = () => { renderCanvas($("canvas-sponsor"), "sponsor"); updateStatus(); };
+
+  function updateStatus(){
+    const live = active.panels.filter(p => p.state === "live").length;
+    const txt = live ? live + " panels taking offers" : "All panels settled";
+    $("stage-status").textContent = txt;
+    $("sp-stage-status").textContent = txt;
+  }
+
+  /* ---------------- bid ledger rendering ---------------- */
+  function renderBids(ul, p){
+    ul.innerHTML = "";
+    if(!p.bids.length){
+      ul.innerHTML = `<li><span class="who" style="color:var(--ink-soft)">No offers yet &mdash; opening at ${money(p.reserve)}</span></li>`;
+      return;
+    }
+    [...p.bids].reverse().forEach((b,i) => {
+      const li = document.createElement("li");
+      li.className = (i === 0 ? "lead " : "out ") + (b.mine ? "mine" : "");
+      const ago = Math.max(0, Math.round((Date.now()-b.t)/1000));
+      li.innerHTML = `<span class="who">${b.brand}</span><span class="amt">${money(b.amount)}</span>
+        <span class="when">${i===0 ? "leading" : ago<90 ? ago+"s ago" : Math.round(ago/60)+"m ago"}</span>`;
+      ul.appendChild(li);
+    });
+  }
+
+  /* ---------------- bride editor ---------------- */
+  function openEditor(p){
+    $("panel-editor").hidden = false;
+    $("panel-title").textContent = p.name;
+    $("zname").value = p.name;
+    $("zprice").value = Math.min(6000, Math.max(150, p.reserve));
+    priceOut();
+    $("panel-hint").textContent =
+      p.state === "live" ? "Live. Offers are coming in below." :
+      p.state === "closed" ? "Settled. " + p.winner.brand + " won it for " + money(p.winner.amount) + "." :
+      "Held back. Open it and choose when offers close.";
+    $("zprice").disabled = p.state !== "held";
+    $("zwindow").disabled = p.state !== "held";
+    $("open-zone").disabled = p.state !== "held";
+    $("close-zone").disabled = p.state === "closed";
+    $("bride-bidbox").hidden = p.state === "held";
+    if(p.state !== "held") renderBids($("bride-bids"), p);
+    tickClocks();
+  }
+  function priceOut(){
+    const v = +$("zprice").value;
+    $("zprice-out").textContent = money(v);
+    $("zprice-ctx").textContent = ctxFor(v);
+  }
+  $("zprice").addEventListener("input", () => {
+    priceOut();
+    const p = P(brideSel); if(p && p.state === "held"){ p.reserve = +$("zprice").value; drawBride(); }
+  });
+  $("zname").addEventListener("input", () => {
+    const p = P(brideSel); if(!p) return;
+    p.name = $("zname").value || "Untitled panel";
+    $("panel-title").textContent = p.name; drawBride();
+  });
+  $("open-zone").addEventListener("click", () => {
+    const p = P(brideSel); if(!p || p.state !== "held") return;
+    p.state = "live";
+    p.closesAt = Date.now() + (+$("zwindow").value)*1000;
+    p.bids = [];
+    toast("<b>" + p.name + "</b> is open. Offers close in " + fmtClock(remaining(p)) + ".");
+    openEditor(p); drawBride(); drawSponsor();
+  });
+  $("close-zone").addEventListener("click", () => {
+    const p = P(brideSel); if(!p || p.state === "closed") return;
+    p.state = "held"; p.closesAt = null; p.bids = [];
+    toast("<b>" + p.name + "</b> pulled from the register.");
+    openEditor(p); drawBride(); drawSponsor();
+  });
+  $("accept-now").addEventListener("click", () => {
+    const p = P(brideSel); if(!p || p.state !== "live") return;
+    const l = lead(p);
+    if(!l){ toast("No offers to accept yet.", "alert"); return; }
+    settle(p, l, true);
+  });
+  $("skip-clock").addEventListener("click", () => {
+    const p = P(brideSel); if(!p || p.state !== "live") return;
+    p.closesAt = Date.now() + 900;
+    toast("Running the clock down on <b>" + p.name + "</b>…");
+  });
+
+  function updateTally(){
+    const list = $("tally-list"); list.innerHTML = "";
+    let total = 0;
+    active.panels.forEach(p => {
+      if(p.state === "closed" && p.winner){
+        total += p.winner.amount;
+        list.insertAdjacentHTML("beforeend",
+          `<div class="tally-row"><span>${p.name} &middot; ${p.winner.brand}</span><b>${money(p.winner.amount)}</b></div>`);
+      } else if(p.state === "live"){
+        const l = lead(p); total += l ? l.amount : 0;
+        const up = l ? Math.round((l.amount/p.reserve-1)*100) : 0;
+        list.insertAdjacentHTML("beforeend",
+          `<div class="tally-row"><span>${p.name} &middot; ${l ? p.bids.length + " offers" : "no offers"}</span>
+           <b>${l ? money(l.amount) : "—"} ${up>0 ? `<span class="up">+${up}%</span>` : ""}</b></div>`);
+      }
+    });
+    if(!list.children.length) list.innerHTML = `<div class="tally-row"><span>Nothing open yet</span><b>&mdash;</b></div>`;
+    $("tally-total").textContent = money(total);
+  }
+
+  $("photo").addEventListener("change", e => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ev => { myPhoto = ev.target.result; drawBride(); drawSponsor(); toast("Your gown is on the stand."); };
+    r.readAsDataURL(f);
+  });
+
+  /* ---------------- sponsor side ---------------- */
+  function syncSponsorPanel(refillAmount){
+    const p = P(spSel);
+    $("sp-empty").hidden = !!p;
+    $("sp-bidbox").hidden = !p;
+    if(!p) return;
+    const min = minNext(p);
+    $("min-bid").textContent = money(min);
+    if(refillAmount || +$("bid-amt").value < min) $("bid-amt").value = min;
+    $("bid-amt").min = min;
+    renderBids($("sp-bids"), p);
+    const closed = p.state !== "live";
+    $("place-bid").disabled = closed;
+    $("bid-plus").disabled = closed;
+    $("place-bid").textContent = closed ? "Bidding closed" : "Place the offer";
+  }
+  $("brand-pick").addEventListener("input", () => drawSponsor());
+  $("bid-plus").addEventListener("click", () => {
+    $("bid-amt").value = (+$("bid-amt").value || 0) + 250;
+  });
+  $("place-bid").addEventListener("click", () => {
+    const p = P(spSel); if(!p || p.state !== "live") return;
+    const amt = +$("bid-amt").value, min = minNext(p);
+    if(!(amt >= min)){ toast("Minimum offer is " + money(min) + ".", "alert"); $("bid-amt").value = min; return; }
+    const brand = ($("brand-pick").value || "Your brand").trim();
+    const sub = ($("brand-sub").value || "").trim();
+    p.bids.push({brand, sub, amount:amt, t:Date.now(), mine:true});
+    extendIfLate(p);
+    toast("You lead the <b>" + p.name.toLowerCase() + "</b> at " + money(amt) + ".");
+    syncSponsorPanel(true); drawSponsor(); drawBride();
+    if(brideSel === p.id) renderBids($("bride-bids"), p);
+  });
+
+  function extendIfLate(p){
+    if(remaining(p) < 30000){
+      p.closesAt = Date.now() + 30000;
+      toast("Late offer &mdash; the clock goes back to 30 seconds.", "alert");
+    }
+  }
+
+  /* ---------------- rival bidders ---------------- */
+  function rivalRound(){
+    const livePanels = [];
+    COUPLES.forEach(c => c.panels.forEach(p => { if(p.state === "live") livePanels.push({c,p}); }));
+    if(!livePanels.length) return;
+    const {c,p} = livePanels[Math.floor(Math.random()*livePanels.length)];
+    if(Math.random() > .62) return;
+    const l = lead(p);
+    if(l && l.amount > p.reserve * 3.2) return;           // rivals know when to stop
+    const pool = RIVALS.filter(r => !l || r[0] !== l.brand);
+    const r = pool[Math.floor(Math.random()*pool.length)];
+    const amt = Math.ceil((minNext(p) * (1 + Math.random()*.09))/50)*50;
+    p.bids.push({brand:r[0], sub:r[1], amount:amt, t:Date.now(), mine:false});
+    if(remaining(p) < 30000) p.closesAt = Date.now() + 30000;
+
+    if(c === active){
+      const wasMine = l && l.mine;
+      if(wasMine && role === "sponsor")
+        toast("<b>" + r[0] + "</b> outbid you on the " + p.name.toLowerCase() + " &mdash; " + money(amt), "alert");
+      else if(role === "bride" && brideSel === p.id)
+        toast("<b>" + r[0] + "</b> raises to " + money(amt) + ".");
+      if(spSel === p.id) syncSponsorPanel(false);
+      if(brideSel === p.id) renderBids($("bride-bids"), p);
+      role === "bride" ? drawBride() : drawSponsor();
+      updateTally();
+    }
+    buildRegister();
+  }
+
+  /* ---------------- settling ---------------- */
+  function settle(p, winningBid, early){
+    p.state = "closed";
+    p.closesAt = null;
+    p.winner = winningBid
+      ? {brand:winningBid.brand, sub:winningBid.sub, amount:winningBid.amount}
+      : null;
+    if(!p.winner){ p.state = "held"; p.bids = []; }
+    if(active.panels.includes(p)){
+      if(p.winner)
+        toast((early ? "Accepted early &mdash; " : "Closed &mdash; ") + "<b>" + p.winner.brand +
+              "</b> takes the " + p.name.toLowerCase() + " for " + money(p.winner.amount) + ".", "win");
+      else
+        toast("<b>" + p.name + "</b> closed with no offers. Back on the rail.", "alert");
+      if(brideSel === p.id) openEditor(p);
+      if(spSel === p.id) syncSponsorPanel(false);
+      drawBride(); drawSponsor();
+    }
+    buildRegister();
+  }
+
+  /* ---------------- clocks ---------------- */
+  function paintClock(el, p){
+    if(!el) return;
+    const t = el.querySelector(".t"), c = el.querySelector(".c");
+    el.classList.remove("urgent","closed");
+    if(!p || p.state === "held"){ t.textContent = "—"; c.textContent = "Not open yet"; return; }
+    if(p.state === "closed"){
+      el.classList.add("closed");
+      t.textContent = "Settled";
+      c.textContent = p.winner ? p.winner.brand + " · " + money(p.winner.amount) : "no offers";
+      return;
+    }
+    const ms = remaining(p);
+    t.textContent = fmtClock(ms);
+    c.textContent = ms < 30000 ? "Any offer now extends the clock" : "Until offers close";
+    if(ms < 30000) el.classList.add("urgent");
+  }
+
+  function tickClocks(){
+    if(brideSel) paintClock($("bride-clock"), P(brideSel));
+    if(spSel) paintClock($("sp-clock"), P(spSel));
+  }
+
+  setInterval(() => {
+    let dirty = false;
+    COUPLES.forEach(c => c.panels.forEach(p => {
+      if(p.state === "live" && remaining(p) <= 0){ settle(p, lead(p), false); dirty = true; }
+    }));
+    tickClocks();
+    if(role === "bride") drawBride(); else drawSponsor();
+    if(dirty) buildRegister();
+  }, 1000);
+
+  setInterval(rivalRound, 5200);
+
+  /* ---------------- register ---------------- */
+  function buildRegister(){
+    const g = $("register-grid"); g.innerHTML = "";
+    COUPLES.forEach(c => {
+      const live = c.panels.filter(p => p.state === "live");
+      const settled = c.panels.filter(p => p.state === "closed");
+      const pot = c.panels.reduce((s,p) => s + (p.winner ? p.winner.amount : (lead(p) ? lead(p).amount : 0)), 0);
+      const soonest = live.reduce((m,p) => Math.min(m, p.closesAt || Infinity), Infinity);
+      const b = document.createElement("button");
+      b.className = "couple";
+      b.setAttribute("aria-pressed", String(c.id === active.id));
+      b.innerHTML = `
+        <div class="thumb">${gownSVG()}</div>
+        <div class="body">
+          <div class="names">${c.names}</div>
+          <div class="meta">${c.when} &middot; ${c.city} &middot; ${c.meta}</div>
+          <div class="meta" style="margin-top:5px;font-style:italic">${c.note}</div>
+          <div class="tags">
+            ${live.length ? `<span class="tag live">${live.length} taking offers</span>` : `<span class="tag">all settled</span>`}
+            ${settled.length ? `<span class="tag">${settled.length} placed</span>` : ""}
+            <span class="tag hot num">${money(pot)} on the table</span>
+            ${soonest < Infinity ? `<span class="tag num">closes ${fmtClock(soonest - Date.now())}</span>` : ""}
+          </div>
+        </div>`;
+      b.addEventListener("click", () => {
+        active = c; brideSel = null; spSel = null;
+        $("stage-name").textContent = c.names + " · " + c.when;
+        $("sp-stage-name").textContent = c.names + " · " + c.city;
+        $("panel-editor").hidden = true;
+        $("panel-title").textContent = c.names + "'s gown";
+        $("panel-hint").textContent = "Tap a panel on the gown to open it, price it, and set the date offers close.";
+        $("sp-empty").hidden = false; $("sp-bidbox").hidden = true;
+        drawBride(); drawSponsor(); buildRegister();
+        $("atelier").scrollIntoView({behavior:"smooth", block:"start"});
+      });
+      g.appendChild(b);
+    });
+  }
+
+  /* ---------------- tabs & nav ---------------- */
+  const tb = $("tab-bride"), ts = $("tab-sponsor");
+  function setRole(bride){
+    role = bride ? "bride" : "sponsor";
+    tb.setAttribute("aria-selected", String(bride));
+    ts.setAttribute("aria-selected", String(!bride));
+    $("view-bride").hidden = !bride;
+    $("view-sponsor").hidden = bride;
+    bride ? drawBride() : drawSponsor();
+  }
+  tb.addEventListener("click", () => setRole(true));
+  ts.addEventListener("click", () => setRole(false));
+  document.querySelectorAll("[data-goto]").forEach(b =>
+    b.addEventListener("click", () => $(b.dataset.goto).scrollIntoView({behavior:"smooth", block:"start"})));
+
+  /* ---------------- boot ---------------- */
+  buildRegister(); drawBride(); drawSponsor(); syncSponsorPanel(true);
+})();
+</script>
