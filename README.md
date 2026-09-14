@@ -1,90 +1,88 @@
-# Sponsor-a-Wedding — three concept demos
+# Sponsor-a-Wedding
 
-Three self-contained prototypes of a marketplace where couples sell advertising space on
-a wedding dress and brands bid for it. Pick a direction, then we build it for real.
+A marketplace where couples sell advertising space on a wedding dress and brands bid
+for it, square inch by square inch.
 
-Each demo is a **single HTML file with no build step and no dependencies** (fonts come from
-Google Fonts over the network). Everything runs in the browser — no server, no accounts,
-no data leaves the page. Photo uploads are read locally with `FileReader` and never sent
-anywhere.
+**`app.html` is the product.** It is the full flow: landing page -> sign up as a couple or
+a brand -> couples upload photos and watch who bid what -> brands browse every open dress
+and bid on the ones they want. The other three files are earlier visual-direction studies,
+kept for reference.
+
+Every file is a **single HTML page with no build step and no dependencies** (fonts load
+from Google Fonts). Photos are read locally with `FileReader` and never leave the browser.
 
 ## Run it
 
-Double-click any of the three `.html` files, or:
+Double-click `app.html`, or from this folder:
 
-```bash
-# from this folder
-start demo-a-something-borrowed.html      # Windows
+```powershell
+start app.html
 ```
 
-If you'd rather serve them (recommended, so the browser treats them as a normal site):
+To serve it instead (any static server works):
 
-```bash
-python -m http.server 8000
-# then open http://localhost:8000/demo-a-something-borrowed.html
+```powershell
+py -m http.server 8000      # Python is installed under `py`, not `python`
+npx serve .                 # or Node
 ```
 
-Any static server works — `npx serve .`, VS Code Live Server, whatever you already have.
+Then open `http://localhost:8000/app.html`.
 
-## The three demos
+## The flow in `app.html`
 
-| File | Name | Aesthetic | Auction model |
-|---|---|---|---|
-| `demo-a-something-borrowed.html` | **Something Borrowed** | Bridal atelier — Italiana/Karla, oyster + bordeaux, quiet | Fixed panels, open outcry, couple has veto |
-| `demo-b-aisle-500.html` | **Aisle 500** | Race-day scoreboard — Anton, neon on black, loud | Fixed panels, live auction floor, hammer drops |
-| `demo-c-bodice-exchange.html` | **Bodice Exchange** | Trading terminal — Instrument Serif + IBM Plex, dense | Free-form land grab, price per square inch |
+1. **Landing** - hero, CTA, an auto-advancing carousel of finished weddings in arched
+   frames, a brand marquee, how-it-works tabs for each side, figures, testimonials.
+2. **Sign in / sign up** - pick your side of the aisle: getting married, or a brand.
+3. **Couple dashboard** - raised so far, bids received, % of dress claimed, a live
+   closing clock. Upload photos and pick which one brands bid on. A **who bid what**
+   table showing every bid, the price per square inch, and whether that brand is still
+   holding or has been outbid. Listing settings: floor price, minimum claim, closing date.
+4. **Brand browse** - every open dress as a card with a live thumbnail of who holds what,
+   a closing timer, % claimed and money raised. Search and filters.
+5. **Brand listing** - drag a rectangle anywhere on the dress, set your price per square
+   inch, and place the bid.
 
-### A — Something Borrowed
-Genteel. Six named panels (veil, bodice, sash, skirts, cathedral hem). The couple opens a
-panel, sets an opening price and a closing window, and brands raise each other. Two things
-make it *bridal* rather than *commercial*: the couple may **accept any bidder on the
-ledger, not just the highest**, and a bid in the last 30 seconds pushes the clock back so
-nobody snipes a wedding.
+Rival brands bid against you every few seconds, so the market moves while you watch.
 
-### B — Aisle 500
-Maximum fun. An arena: live bid ticker across every wedding on the card, quick-bid chips,
-auto-bid with a cap, outbid sirens, a leaderboard of who's actually spending, an F1
-lights-out sequence when the couple opens a panel, and confetti when the hammer drops.
+## The bite rule
 
-### C — Bodice Exchange — *the one with your overlap rule*
-This is where the "brands can bite into each other's space" mechanic lives.
+The mechanic the whole marketplace runs on. The dress is a grid of ~1,300 claimable
+cells clipped to the gown silhouette; each cell is a fixed number of square inches.
 
-- The gown is a grid of ~1,400 claimable cells, each worth a fixed number of square inches.
-- A brand **drags any rectangle** on the dress and names a price. That gives a
-  **density**: `offer ÷ area = $ per square inch`.
-- The overlap is settled **cell by cell, not deal by deal**:
-  - empty cell → you take it
-  - held cell where `your density > their density` → **you bite it out of their shape**
-  - held cell where `their density ≥ yours` → **blocked**, you can't have it
-- You pay `your density × the area you actually landed` — never for space you were
+- A claim's **density** is `offer / area = $ per square inch`.
+- Overlap is settled **cell by cell, not deal by deal**:
+  - empty cell -> you take it
+  - held cell, `your density > their density` -> **you bite it out of their shape**
+  - held cell, `their density >= yours` -> **blocked**, you cannot have it
+- You pay `your density x the area you actually landed` - never for space you were
   blocked from.
-- The brand you bit is **refunded `their density × the area they lost`** and their
-  blended price per inch is recalculated. Their shape is now an L, or a ring, or worse.
-- While you drag you get a live three-colour readout: green = open fabric, gold = you'd
-  bite it, red hatch = priced out. That's the fun part.
+- The brand you bit is **refunded `their density x the area they lost`**, and their
+  blended price per inch is recalculated.
 
-Because of all this, **regions stop being rectangles almost immediately** — which is the
-point. The canvas draws each holder's region by outlining only the edges where the
-neighbouring cell has a different owner, so the bites read clearly.
+So regions stop being rectangles almost immediately - they become Ls, rings and
+staircases. The canvas draws each holder by outlining only the edges where the
+neighbouring cell has a different owner, which is what makes the bites legible.
 
-Rules the couple controls from the Couple desk: floor price per square inch, smallest
-claim they'll accept, and when bidding closes.
+While you drag you get a live three-colour readout: **green** open fabric, **gold** space
+you would take off a rival, **red hatch** space you are priced out of.
 
-## Notes on the fork
+The engine is `evaluate()` and `commit()` in `app.html` - about 40 lines, no dependencies.
 
-A and B use **fixed panels**; C uses the **free-form land grab**. That's a real product
-decision, not just a visual one:
+The couple controls the floor price per square inch, the smallest claim they will accept,
+and when bidding closes.
 
-- Fixed panels are easier to explain, easier to price, and easier for a seamstress to
-  actually execute. Better for the first version.
-- The land grab is far more fun and creates genuine competitive tension, but every claim
-  is a different irregular shape someone has to physically make.
+## The earlier direction studies
 
-The bite engine in C is self-contained (`evaluate()` and `commit()` in
-`demo-c-bodice-exchange.html`) and ports cleanly onto A or B if you like one of those
-looks better.
+| File | Direction | Auction model |
+|---|---|---|
+| `demo-a-something-borrowed.html` | Bridal atelier, quiet | Fixed named panels, open outcry, couple has veto |
+| `demo-b-aisle-500.html` | Race-day scoreboard, loud | Fixed panels, live floor, hammer drops, confetti |
+| `demo-c-bodice-exchange.html` | Trading terminal, dense | The bite rule, first version |
+
+`app.html` takes the visual language of A and the mechanic of C, and puts both behind a
+proper landing page.
 
 ## Not real
 
-Every brand, couple, price, bid and statistic in these files is invented for the demo.
-No real company is depicted.
+Every brand, couple, price, bid and statistic is invented for the demo. No real company
+is depicted.
