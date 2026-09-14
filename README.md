@@ -1,88 +1,95 @@
 # Sponsor-a-Wedding
 
-A marketplace where couples sell advertising space on a wedding dress and brands bid
-for it, square inch by square inch.
+A marketplace where a woman sells advertising space on her wedding dress, and brands
+bid for it square inch by square inch.
 
-**`app.html` is the product.** It is the full flow: landing page -> sign up as a couple or
-a brand -> couples upload photos and watch who bid what -> brands browse every open dress
-and bid on the ones they want. The other three files are earlier visual-direction studies,
-kept for reference.
+**`squareinch.html` is the current direction.** Open that one first.
 
-Every file is a **single HTML page with no build step and no dependencies** (fonts load
-from Google Fonts). Photos are read locally with `FileReader` and never leave the browser.
+Every file is a **single HTML page, no build step, no dependencies** (fonts load from
+Google Fonts). Photographs are read locally with `FileReader` and never leave the browser.
 
 ## Run it
 
-Double-click `app.html`, or from this folder:
+Double-click `squareinch.html`, or from this folder:
 
 ```powershell
-start app.html
+start squareinch.html
 ```
 
-To serve it instead (any static server works):
+To serve it instead:
 
 ```powershell
 py -m http.server 8000      # Python is installed under `py`, not `python`
 npx serve .                 # or Node
 ```
 
-Then open `http://localhost:8000/app.html`.
+Then open `http://localhost:8000/squareinch.html`.
 
-## The flow in `app.html`
+## Square Inch
 
-1. **Landing** - hero, CTA, an auto-advancing carousel of finished weddings in arched
-   frames, a brand marquee, how-it-works tabs for each side, figures, testimonials.
-2. **Sign in / sign up** - pick your side of the aisle: getting married, or a brand.
-3. **Couple dashboard** - raised so far, bids received, % of dress claimed, a live
-   closing clock. Upload photos and pick which one brands bid on. A **who bid what**
-   table showing every bid, the price per square inch, and whether that brand is still
-   holding or has been outbid. Listing settings: floor price, minimum claim, closing date.
-4. **Brand browse** - every open dress as a card with a live thumbnail of who holds what,
-   a closing timer, % claimed and money raised. Search and filters.
-5. **Brand listing** - drag a rectangle anywhere on the dress, set your price per square
-   inch, and place the bid.
+Proud, rational, exact. The audience is a woman who has costed her own wedding and
+worked out that the dress is the only line item that can earn. Nothing about the page
+apologises for that, and nothing is cute.
 
-Rival brands bid against you every few seconds, so the market moves while you watch.
+The look is a pattern-cutting table that happens to run a market: hairline rules,
+dimension lines, tabular figures, every number stated to the cent. Bodoni Moda carries
+the voice, Archivo carries the interface, and IBM Plex Mono carries every measurement.
 
-## The bite rule
+The flow:
 
-The mechanic the whole marketplace runs on. The dress is a grid of ~1,300 claimable
-cells clipped to the gown silhouette; each cell is a fixed number of square inches.
+1. **Landing** - the gown drawn as a technical flat with real dimension callouts and its
+   sellable area; a live spec bar; a **rate card** showing what each panel actually
+   clears at; settled listings in a filmstrip; method, figures, clients.
+2. **Open an account** - it's my dress, or I'm buying.
+3. **Client** - under contract, bids received, area sold, closing clock. Upload
+   photographs and choose which one buyers bid against. A full **bid history** with each
+   brand's rate, allocation, who they took area from, and whether they still hold it.
+   Terms: floor rate, minimum allocation, closing time.
+4. **The book** - every open gown with its clearing rate, unsold area and closing timer.
+5. **Listing** - mark out an allocation on the gown, state your rate per square inch,
+   see the quote, place the bid.
 
-- A claim's **density** is `offer / area = $ per square inch`.
-- Overlap is settled **cell by cell, not deal by deal**:
-  - empty cell -> you take it
-  - held cell, `your density > their density` -> **you bite it out of their shape**
-  - held cell, `their density >= yours` -> **blocked**, you cannot have it
-- You pay `your density x the area you actually landed` - never for space you were
-  blocked from.
-- The brand you bit is **refunded `their density x the area they lost`**, and their
-  blended price per inch is recalculated.
+Rival buyers bid every few seconds, so the market moves while you watch.
 
-So regions stop being rectangles almost immediately - they become Ls, rings and
-staircases. The canvas draws each holder by outlining only the edges where the
-neighbouring cell has a different owner, which is what makes the bites legible.
+## The rule the market runs on
 
-While you drag you get a live three-colour readout: **green** open fabric, **gold** space
-you would take off a rival, **red hatch** space you are priced out of.
+The gown is a grid of ~1,300 claimable cells clipped to the silhouette; each cell is a
+fixed number of square inches.
 
-The engine is `evaluate()` and `commit()` in `app.html` - about 40 lines, no dependencies.
+- A bid's **rate** is `offer / area = $ per square inch`.
+- Overlap settles **cell by cell, not deal by deal**:
+  - unsold cell -> allocated to you
+  - held cell, `your rate > their rate` -> **reallocated to you**
+  - held cell, `their rate >= yours` -> **priced out**, you cannot have it
+- You pay `your rate x the area you actually landed` - never for area you were priced
+  out of.
+- The brand you took area from is **refunded `their rate x the area lost`**, and their
+  blended rate is recalculated.
 
-The couple controls the floor price per square inch, the smallest claim they will accept,
-and when bidding closes.
+Allocations therefore stop being rectangles almost immediately. The canvas outlines only
+the edges where the neighbouring cell has a different owner, which is what makes the
+shapes legible. While you drag: **green** unsold, **gold** area you would take, **red
+hatch** area you are priced out of.
 
-## The earlier direction studies
+The engine is `evaluate()` and `commit()` - about 40 lines, no dependencies. Your own
+brand always renders in a reserved blue so it never collides with a rival's colour.
 
-| File | Direction | Auction model |
-|---|---|---|
-| `demo-a-something-borrowed.html` | Bridal atelier, quiet | Fixed named panels, open outcry, couple has veto |
-| `demo-b-aisle-500.html` | Race-day scoreboard, loud | Fixed panels, live floor, hammer drops, confetti |
-| `demo-c-bodice-exchange.html` | Trading terminal, dense | The bite rule, first version |
+## Files
 
-`app.html` takes the visual language of A and the mechanic of C, and puts both behind a
-proper landing page.
+| File | What it is |
+|---|---|
+| `squareinch.html` | **Current direction.** Precise, proud, adult. |
+| `app.html` | Same product, softer bridal-marketplace styling. |
+| `demo-a-something-borrowed.html` | Early study: bridal atelier, fixed named panels |
+| `demo-b-aisle-500.html` | Early study: race-day auction floor |
+| `demo-c-bodice-exchange.html` | Early study: trading terminal, first bite engine |
+
+`build/build-squareinch.py` regenerates `squareinch.html` from
+`build/squareinch-shell.html` (markup and CSS) plus the market engine in `app.html`.
+Run it from the repo root with `py build/build-squareinch.py`. Edit the shell or
+`app.html`, then rebuild - do not hand-edit `squareinch.html`.
 
 ## Not real
 
-Every brand, couple, price, bid and statistic is invented for the demo. No real company
+Every brand, client, rate, bid and statistic is invented for the demo. No real company
 is depicted.
