@@ -114,12 +114,29 @@
   .hero{padding:52px 0 26px}
   .hero .in{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:50px;align-items:center}
   @media(max-width:980px){.hero .in{grid-template-columns:1fr;gap:30px}}
-  .hero h1{font-size:clamp(2.5rem,5.2vw,4.3rem)}
+  .hero h1{font-size:clamp(2.5rem,5.2vw,4.3rem);line-height:1.14}
   .hero h1 .w{display:inline-block;opacity:0;transform:translateY(28px) rotate(3deg);
     animation:word .85s cubic-bezier(.2,.9,.3,1) forwards}
   @keyframes word{to{opacity:1;transform:none}}
   @media(prefers-reduced-motion:reduce){.hero h1 .w{animation:none;opacity:1;transform:none}}
   .hero h1 em{font-style:italic}
+  .hl{position:relative;display:inline-block;isolation:isolate;font-style:italic}
+  .hl-t{display:inline-block;position:relative;z-index:1;padding:.04em .07em .17em;line-height:1.06}
+  .hl-bg{position:absolute;left:0;right:0;top:.12em;bottom:.13em;z-index:0;border-radius:5px;
+    background:#FFF6FC;box-shadow:0 0 26px rgba(255,255,255,.45);
+    transform:scaleX(0);transform-origin:left center}
+  .hl.go .hl-bg{animation:hlSweep 2.6s cubic-bezier(.66,0,.3,1) both}
+  .hl.go .hl-t{animation:hlInk 2.6s linear both}
+  @keyframes hlSweep{
+    0%{transform:scaleX(0);transform-origin:left center}
+    30%{transform:scaleX(1);transform-origin:left center}
+    64%{transform:scaleX(1);transform-origin:right center}
+    94%,100%{transform:scaleX(0);transform-origin:right center}}
+  @keyframes hlInk{
+    0%,7%{-webkit-text-fill-color:transparent;color:transparent}
+    12%,61%{-webkit-text-fill-color:#1A0B29;color:#1A0B29}
+    68%,100%{-webkit-text-fill-color:transparent;color:transparent}}
+  @media(prefers-reduced-motion:reduce){.hl.go .hl-bg,.hl.go .hl-t{animation:none}}
   .hero .sub{margin-top:24px;max-width:48ch;font-size:1.12rem;color:var(--soft)}
   .hero .sub b{color:var(--text);font-weight:600}
   .hero .cta{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
@@ -129,8 +146,16 @@
   .terms span i{width:6px;height:6px;border-radius:50%;background:var(--aqua);flex:none}
 
   /* interactive hero gown */
-  .flat{position:relative;aspect-ratio:3/4;max-width:430px;margin:0 auto;width:100%;
-    filter:drop-shadow(0 30px 60px rgba(0,0,0,.5))}
+  .flat{position:relative;aspect-ratio:3/4;max-width:460px;margin:0 auto;width:100%;
+    filter:drop-shadow(0 30px 60px rgba(0,0,0,.5));touch-action:none;cursor:grab}
+  .flat.grabbing{cursor:grabbing}
+  .flat canvas{display:block;width:100%;height:100%}
+  .spinhint{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);display:flex;align-items:center;
+    gap:8px;padding:6px 14px;border-radius:999px;background:rgba(22,7,38,.7);border:1px solid var(--edge);
+    font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--soft);pointer-events:none;transition:opacity .4s}
+  .spinhint.gone{opacity:0}
+  .spinhint svg{width:13px;height:13px}
   .flat svg.gown{position:absolute;inset:0;width:100%;height:100%}
   .hp{position:absolute;transform:translate(-50%,-50%) scale(.4);opacity:0;
     padding:6px 12px;border-radius:999px;white-space:nowrap;cursor:default;
@@ -778,3 +803,4 @@
   </div>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>

@@ -111,14 +111,23 @@ EXTRA = r'''
      ============================================================ */
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  /* headline: word-by-word entrance */
+  /* headline: word-by-word entrance, then a highlighter sweep on the payoff */
   (function heroWords(){
     const el = $("hero-h1");
     if(!el) return;
     const line = ["You", "own", "the", "most", "photographed", "surface", "in", "the", "room."];
-    el.innerHTML = line.map((w,i) =>
-      `<span class="w" style="animation-delay:${0.05 + i*0.055}s">${w}</span>`).join(" ") +
-      ` <em class="w grad" style="animation-delay:${0.05 + line.length*0.055}s">Charge for it.</em>`;
+    const last = 0.05 + line.length * 0.055;
+    el.innerHTML =
+      line.map((w,i) => `<span class="w" style="animation-delay:${0.05 + i*0.055}s">${w}</span>`).join(" ") +
+      ` <span class="w hl" id="hl" style="animation-delay:${last}s">` +
+        `<span class="hl-bg"></span><span class="hl-t grad">Charge for it.</span></span>`;
+
+    const hl = $("hl");
+    if(!hl || reduced) return;
+    const sweep = () => { hl.classList.remove("go"); void hl.offsetWidth; hl.classList.add("go"); };
+    setTimeout(sweep, (last + 0.7) * 1000);
+    setInterval(sweep, 9000);
+    hl.addEventListener("mouseenter", sweep);
   })();
 
   /* reveal on scroll */
@@ -150,24 +159,200 @@ EXTRA = r'''
     document.querySelectorAll(".figures, .ratecard").forEach(el => io.observe(el));
   })();
 
-  /* the hero gown you can actually poke */
-  function heroFlat(){
+  /* ============================================================
+     THE HERO GOWN IN 3D
+     A solid of revolution built from the same profile the market uses,
+     so the thing you spin is the thing you bid on. Drag to rotate.
+     ============================================================ */
+  const HERO_PANELS = [
+    {v:0.30, a:0.00,        name:"BODICE",  area:28, rate:24.00, col:"#FF2E93"},
+    {v:0.45, a:0.95,        name:"SASH",    area:22, rate:19.00, col:"#C08BFF"},
+    {v:0.66, a:-0.85,       name:"SKIRT L", area:64, rate:11.00, col:"#2BE8C5"},
+    {v:0.88, a:0.25,        name:"TRAIN",   area:96, rate:14.50, col:"#FFAE2B"},
+    {v:0.55, a:Math.PI,     name:"BACK",    area:40, rate:12.50, col:"#C6F32B"}
+  ];
+
+  function patchTexture(p){
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 152;
+    const x = c.getContext("2d");
+    const r = 26;
+    x.fillStyle = "rgba(18,6,32,.93)";
+    x.beginPath();
+    x.moveTo(r,0); x.arcTo(512,0,512,152,r); x.arcTo(512,152,0,152,r);
+    x.arcTo(0,152,0,0,r); x.arcTo(0,0,512,0,r); x.closePath(); x.fill();
+    x.lineWidth = 6; x.strokeStyle = p.col; x.stroke();
+    x.textAlign = "center";
+    x.fillStyle = p.col;
+    x.font = "700 52px 'IBM Plex Mono', monospace";
+    x.fillText(p.name, 256, 62);
+    x.fillStyle = "#EFE4F8";
+    x.font = "500 36px 'IBM Plex Mono', monospace";
+    x.fillText(p.area + " in\u00b2  \u00b7  " + money(p.area * p.rate), 256, 112);
+    const t = new THREE.CanvasTexture(c);
+    t.anisotropy = 4;
+    return t;
+  }
+
+  function hero3D(){
+    const host = $("hero-flat");
+    if(!host || !window.THREE) return false;
+
+    const V_TOP = 0.19, V_HEM = 0.985, Y_TOP = 1.50, Y_HEM = -2.00;
+    const yAt = v => Y_TOP - (v - V_TOP) / (V_HEM - V_TOP) * (Y_TOP - Y_HEM);
+    const mix = (a,b,k) => a + (b-a)*k;
+    /* A gown profile, not a cone: bust, nipped waist, then the skirt opens up. */
+    const rAt = v => {
+      if(v < 0.30) return mix(0.70, 0.80, (v-0.19)/0.11);
+      if(v < 0.44) return mix(0.80, 0.46, (v-0.30)/0.14);
+      return 0.46 + Math.pow((v-0.44)/0.545, 1.28) * (2.05-0.46);
+    };
+    /* outward surface normal at v, in the (radius, height) plane */
+    const normAt = v => {
+      const d = 0.008;
+      const dr = rAt(Math.min(V_HEM,v+d)) - rAt(Math.max(V_TOP,v-d));
+      const dy = yAt(Math.min(V_HEM,v+d)) - yAt(Math.max(V_TOP,v-d));
+      const nr = -dy, ny = dr, L = Math.hypot(nr, ny) || 1;
+      return {r:nr/L, y:ny/L};
+    };
+
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(30, 3/4, 0.1, 100);
+    cam.position.set(0, 0.25, 11.6);
+    cam.lookAt(0, -0.42, 0);
+
+    const gl = new THREE.WebGLRenderer({antialias:true, alpha:true});
+    gl.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    host.appendChild(gl.domElement);
+
+    const rig = new THREE.Group();
+    scene.add(rig);
+
+    /* the gown */
+    const pts = [];
+    for(let k=0;k<=72;k++){
+      const v = V_TOP + (V_HEM - V_TOP) * k/72;
+      pts.push(new THREE.Vector2(Math.max(0.02, rAt(v)), yAt(v)));
+    }
+    const gown = new THREE.Mesh(
+      new THREE.LatheGeometry(pts, 96),
+      new THREE.MeshStandardMaterial({color:0xF7F0FD, roughness:.52, metalness:.08,
+                                      side:THREE.DoubleSide, flatShading:false})
+    );
+    rig.add(gown);
+
+    /* a breath of tulle over the top so the silk has depth */
+    const tulle = new THREE.Mesh(
+      new THREE.LatheGeometry(pts.map(q => new THREE.Vector2(q.x*1.035 + .012, q.y)), 96),
+      new THREE.MeshStandardMaterial({color:0xE9DCF6, roughness:.85, metalness:0,
+        transparent:true, opacity:.28, side:THREE.DoubleSide, depthWrite:false})
+    );
+    rig.add(tulle);
+
+    /* a hem disc so the skirt doesn't read as hollow */
+    const hem = new THREE.Mesh(
+      new THREE.CircleGeometry(rAt(V_HEM), 96),
+      new THREE.MeshStandardMaterial({color:0xCDBBDD, roughness:.8, side:THREE.DoubleSide})
+    );
+    hem.rotation.x = Math.PI/2; hem.position.y = yAt(V_HEM);
+    rig.add(hem);
+
+    /* a couture dress form: rounded bust cap, no head - reads as product, not cartoon */
+    const silk = new THREE.MeshStandardMaterial({color:0xF7F0FD, roughness:.52, metalness:.08});
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(rAt(V_TOP), 64, 40, 0, Math.PI*2, 0, Math.PI*0.5), silk);
+    cap.scale.set(1, 0.72, 1); cap.position.y = Y_TOP; rig.add(cap);
+
+    /* the stand it sits on */
+    const steel = new THREE.MeshStandardMaterial({color:0x6E5A82, roughness:.35, metalness:.75});
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.9,24), steel);
+    post.position.y = Y_HEM - .42; rig.add(post);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(.62,.72,.1,48), steel);
+    base.position.y = Y_HEM - .9; rig.add(base);
+
+    /* sponsor panels, sitting on the surface and turning with it */
+    HERO_PANELS.forEach(p => {
+      const r = rAt(p.v), y = yAt(p.v);
+      const m = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.24, 0.37),
+        new THREE.MeshBasicMaterial({map:patchTexture(p), transparent:true, side:THREE.DoubleSide})
+      );
+      const n = normAt(p.v), off = .08;
+      const x = Math.sin(p.a) * (r + n.r*off), z = Math.cos(p.a) * (r + n.r*off);
+      m.position.set(x, y + n.y*off, z);
+      m.lookAt(x + Math.sin(p.a)*n.r*3, y + n.y*off + n.y*3, z + Math.cos(p.a)*n.r*3);
+      rig.add(m);
+    });
+
+    /* light it like the page */
+    scene.add(new THREE.HemisphereLight(0xC9A6F5, 0x1A0B29, .95));
+    const key = new THREE.DirectionalLight(0xFFFFFF, 1.05); key.position.set(3.5,5,6); scene.add(key);
+    const rimA = new THREE.PointLight(0xFF2E93, 1.5, 22); rimA.position.set(-4,1.6,3); scene.add(rimA);
+    const rimB = new THREE.PointLight(0x2BE8C5, 1.1, 22); rimB.position.set(4,-1.2,3.4); scene.add(rimB);
+
+    /* spin it */
+    let drag = false, lastX = 0, vel = 0.0045, idle = 0;
+    const onDown = e => { drag = true; lastX = e.clientX; idle = 0;
+      host.classList.add("grabbing"); host.setPointerCapture(e.pointerId);
+      const h = host.querySelector(".spinhint"); if(h) h.classList.add("gone"); };
+    const onMove = e => { if(!drag) return;
+      const dx = e.clientX - lastX; lastX = e.clientX;
+      rig.rotation.y += dx * 0.0095; vel = dx * 0.0022; };
+    const onUp = () => { drag = false; host.classList.remove("grabbing"); };
+    host.addEventListener("pointerdown", onDown);
+    host.addEventListener("pointermove", onMove);
+    host.addEventListener("pointerup", onUp);
+    host.addEventListener("pointercancel", onUp);
+
+    function size(){
+      const w = host.clientWidth, h = host.clientHeight;
+      if(!w || !h) return;
+      gl.setSize(w, h, false);
+      cam.aspect = w/h; cam.updateProjectionMatrix();
+    }
+    new ResizeObserver(size).observe(host);
+    size();
+
+    let visible = true;
+    new IntersectionObserver(es => visible = es[0].isIntersecting, {threshold:0})
+      .observe(host);
+
+    (function loop(){
+      requestAnimationFrame(loop);
+      if(!visible) return;
+      if(!drag){
+        if(!reduced){
+          idle += 1;
+          const target = idle > 45 ? 0.0045 : vel;
+          vel += (target - vel) * 0.04;
+          rig.rotation.y += vel;
+        }
+      }
+      gl.render(scene, cam);
+    })();
+
+    host.insertAdjacentHTML("beforeend",
+      '<span class="spinhint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Drag to spin</span>');
+    return true;
+  }
+
+  /* flat fallback if WebGL or the CDN is unavailable */
+  function heroFlatFallback(){
     const el = $("hero-flat");
     if(!el) return;
-    const tags = [
-      {x:50, y:31, c:"m", n:"BODICE",  a:28, r:24.00},
-      {x:35, y:63, c:"a", n:"SKIRT L", a:64, r:11.00},
-      {x:66, y:52, c:"l", n:"SASH",    a:22, r:19.00},
-      {x:50, y:88, c:"m", n:"TRAIN",   a:96, r:14.50}
-    ];
+    el.style.cursor = "default";
     el.insertAdjacentHTML("afterbegin", gownSVG());
-    tags.forEach((t,i) => {
+    HERO_PANELS.filter(p => p.name !== "BACK").forEach((p,i) => {
+      const x = 50 + Math.sin(p.a) * 16;
       el.insertAdjacentHTML("beforeend",
-        `<span class="hp ${t.c}" style="left:${t.x}%;top:${t.y}%;animation-delay:${0.5 + i*0.14}s"
-               title="${t.n}: ${t.a} sq in at ${money2(t.r)} per square inch">
-           ${t.n} &middot; ${t.a} in&sup2; &middot; <b>${money(t.a*t.r)}</b></span>`);
+        `<span class="hp" style="left:${x}%;top:${p.v*100}%;animation-delay:${0.5 + i*0.14}s;
+           border-color:${p.col};color:${p.col}">
+           ${p.name} &middot; ${p.area} in&sup2; &middot; <b>${money(p.area*p.rate)}</b></span>`);
     });
   }
+
+  function heroArt(){ if(!hero3D()) heroFlatFallback(); }
 
   /* ticker */
   function spec(){
@@ -221,7 +406,7 @@ if marker not in js:
     raise SystemExit("boot marker missing")
 js = js.replace(marker, EXTRA + marker, 1)
 js = js.replace('buildCarousel(); restartCar(); renderSteps("couple"); renderNavRight(); syncAuth();',
-                'buildCarousel(); restartCar(); renderSteps("couple"); renderNavRight(); syncAuth(); spec(); heroFlat();', 1)
+                'buildCarousel(); restartCar(); renderSteps("couple"); renderNavRight(); syncAuth(); spec(); heroArt();', 1)
 
 out = h + js
 i = out.index("<script>")

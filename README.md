@@ -36,10 +36,17 @@ aqua, drifting light behind everything. Bodoni Moda carries the voice, Outfit ca
 the interface, IBM Plex Mono carries every measurement. The precision lives in the
 numbers, not the palette.
 
-Motion: the headline assembles word by word, sections rise as you reach them, the season
-figures count up, rate-card heat bars fill, the hero gown carries live price tags you can
-hover, holders land with a spring, and confetti fires when you take ground off a rival.
-All of it respects `prefers-reduced-motion`.
+Motion: the headline assembles word by word and a white highlighter sweeps across
+"Charge for it." on a loop, sections rise as you reach them, the season figures count up,
+rate-card heat bars fill, holders land with a spring, and confetti fires when you take
+ground off a rival. All of it respects `prefers-reduced-motion`.
+
+**The hero gown is real 3D.** It is a solid of revolution built with three.js from a
+bust-waist-hem profile, on a mannequin stand, lit with the page's own magenta and aqua.
+Drag it to spin; let go and it keeps turning. The sponsor panels are textured planes
+sitting flush on the surface along the true surface normal, so they wrap with the dress -
+including one on the back you only find by spinning it. If three.js or WebGL is
+unavailable the hero falls back to the flat SVG gown automatically.
 
 The flow:
 
