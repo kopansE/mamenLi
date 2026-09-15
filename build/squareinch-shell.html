@@ -146,6 +146,16 @@
     border:1px solid var(--edge-soft);background:rgba(255,255,255,.04);font-size:.8rem;color:var(--soft)}
   .terms span i{width:6px;height:6px;border-radius:50%;background:var(--aqua);flex:none}
 
+  /* what am I selling */
+  .heroswitch{display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
+  .hs-label{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--soft);margin-right:4px}
+  .heroswitch button{padding:9px 20px;border-radius:999px;font-weight:700;font-size:.88rem;
+    color:var(--soft);border:1.5px solid var(--edge-soft);background:rgba(255,255,255,.04);transition:.25s}
+  .heroswitch button:hover{color:var(--text);border-color:var(--lilac)}
+  .heroswitch button[aria-selected="true"]{background:linear-gradient(96deg,var(--magenta),#FF6A3D);
+    color:#fff;border-color:transparent;box-shadow:0 8px 22px -10px rgba(255,46,147,.9)}
+
   /* interactive hero gown */
   .flat{position:relative;aspect-ratio:3/4;max-width:460px;margin:0 auto;width:100%;
     filter:drop-shadow(0 30px 60px rgba(0,0,0,.5));touch-action:none;cursor:grab}
@@ -386,10 +396,16 @@
   .dropzone small{color:var(--soft);font-size:.8rem}
   .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:9px;margin-top:13px}
   .gallery .th{position:relative;aspect-ratio:3/4;border-radius:12px;overflow:hidden;
-    border:2px solid transparent;background:rgba(255,255,255,.05);padding:0;transition:.22s}
+    border:2px solid transparent;background:rgba(255,255,255,.05);transition:.22s}
   .gallery .th:hover{transform:translateY(-3px)}
+  .gallery .th .pick{display:block;width:100%;height:100%;padding:0}
   .gallery .th img{width:100%;height:100%;object-fit:cover;display:block}
-  .gallery .th[aria-pressed="true"]{border-color:var(--magenta);box-shadow:var(--glow-m)}
+  .gallery .th.on{border-color:var(--magenta);box-shadow:var(--glow-m)}
+  .gallery .th .del{position:absolute;right:4px;top:4px;width:22px;height:22px;border-radius:50%;
+    display:grid;place-items:center;background:rgba(11,4,20,.82);color:var(--text);
+    font-size:1rem;line-height:1;opacity:0;transition:.18s}
+  .gallery .th:hover .del,.gallery .th:focus-within .del{opacity:1}
+  .gallery .th .del:hover{background:var(--magenta);color:#fff;transform:scale(1.1)}
   .gallery .th .badge{position:absolute;left:4px;bottom:4px;font-family:"IBM Plex Mono",monospace;font-size:.5rem;
     letter-spacing:.1em;text-transform:uppercase;background:var(--magenta);color:#fff;padding:2px 6px;border-radius:999px}
 
@@ -480,6 +496,21 @@
     border:1px solid var(--edge-soft);background:rgba(255,255,255,.04);font-size:.9rem;cursor:pointer}
   .check input{accent-color:var(--magenta);width:17px;height:17px}
 
+  /* ---------- room chat ---------- */
+  .chat{list-style:none;margin:0;padding:14px 16px;max-height:300px;overflow-y:auto;display:grid;gap:12px}
+  .chat li{display:grid;gap:3px;justify-items:start}
+  .chat li.me{justify-items:end}
+  .chat .w{font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.11em;
+    text-transform:uppercase;color:var(--soft)}
+  .chat .w small{margin-left:7px;opacity:.7;text-transform:none;letter-spacing:.04em}
+  .chat .t{max-width:92%;padding:9px 13px;border-radius:14px;font-size:.87rem;line-height:1.45;
+    background:rgba(255,255,255,.06);border:1px solid var(--edge-soft)}
+  .chat li.client .t{border-color:var(--magenta);background:rgba(255,46,147,.12)}
+  .chat li.me .t{background:linear-gradient(96deg,rgba(43,232,197,.18),rgba(192,139,255,.18));
+    border-color:var(--aqua)}
+  .chatbar{display:flex;gap:8px;padding:0 16px 16px}
+  .chatbar .inp{flex:1}
+
   /* ---------- payment ---------- */
   .modal{position:fixed;inset:0;z-index:95;display:grid;place-items:center;padding:22px;
     background:rgba(11,4,20,.72)}
@@ -562,6 +593,11 @@
         </div>
       </div>
       <div>
+        <div class="heroswitch" role="tablist" aria-label="What you're selling">
+          <span class="hs-label">I'm selling my</span>
+          <button role="tab" id="hs-gown" aria-selected="true">Gown</button>
+          <button role="tab" id="hs-suit" aria-selected="false">Suit</button>
+        </div>
         <div class="flat" id="hero-flat"></div>
       </div>
     </div>
@@ -891,6 +927,16 @@
         <div class="card">
           <div class="hd"><h3>What you're buying</h3><span class="pill you" id="pay-mode">Demo mode</span></div>
           <div class="bd" id="lst-audience"></div>
+        </div>
+
+        <div class="card">
+          <div class="hd"><h3>Room chat</h3><span class="pill live" id="chat-mode">Live</span></div>
+          <ul class="chat" id="chat-log"></ul>
+          <div class="chatbar">
+            <input class="inp" id="chat-input" type="text" maxlength="400"
+                   placeholder="Ask the couple something...">
+            <button class="btn sm" id="chat-send"><span>Send</span></button>
+          </div>
         </div>
 
         <div class="card">

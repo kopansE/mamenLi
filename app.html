@@ -1381,15 +1381,33 @@
     const c = myCouple();
     $("cl-photocount").textContent = c.photos.length + " uploaded";
     $("cl-gallery").innerHTML = c.photos.map((p,i) =>
-      `<button class="th" data-i="${i}" aria-pressed="${c.photo === p}">
-         <img src="${p}" alt="Dress photo ${i+1}">
-         ${c.photo === p ? `<span class="badge">Live</span>` : ""}</button>`).join("");
-    $("cl-gallery").querySelectorAll(".th").forEach(b =>
+      `<div class="th ${c.photo === p ? "on" : ""}">
+         <button class="pick" data-i="${i}" aria-pressed="${c.photo === p}"
+                 title="Use this one"><img src="${p}" alt="Photo ${i+1}"></button>
+         ${c.photo === p ? `<span class="badge">Live</span>` : ""}
+         <button class="del" data-del="${i}" title="Remove this photo"
+                 aria-label="Remove photo ${i+1}">&times;</button>
+       </div>`).join("");
+
+    $("cl-gallery").querySelectorAll(".pick").forEach(b =>
       b.addEventListener("click", () => {
         const c2 = myCouple();
         c2.photo = c2.photos[+b.dataset.i];
         clPlot.load(c2); renderGallery();
         toast("That photo is now the one brands bid on.", "good");
+      }));
+
+    $("cl-gallery").querySelectorAll(".del").forEach(b =>
+      b.addEventListener("click", e => {
+        e.stopPropagation();
+        const c2 = myCouple(), i = +b.dataset.del, gone = c2.photos[i];
+        c2.photos.splice(i, 1);
+        if(c2.photo === gone){
+          /* fall back to the next photo, or to the drawn garment */
+          c2.photo = c2.photos[0] || null;
+        }
+        clPlot.load(c2); renderGallery();
+        toast(c2.photos.length ? "Photo removed." : "All photos removed - showing the drawing.", "bad");
       }));
   }
 
@@ -1574,6 +1592,85 @@
   }
 
   /* ============================================================
+     LIVE CHAT - one room per listing
+     Talks to the server when there is one; otherwise it keeps the
+     conversation in memory so the demo still works.
+     ============================================================ */
+  const CHAT = {
+    room:null, since:0, timer:null, live:false, local:{},
+    seedFor(id){
+      const c = COUPLES.find(x => x.id === id);
+      if(!c) return [];
+      const t = Date.now();
+      return [
+        {id:"s1", who:c.names, role:"client", at:t-420000,
+         text:"Hi all \u2014 happy to answer anything before you bid."},
+        {id:"s2", who:"Halcyon Hotels", role:"brand", at:t-300000,
+         text:"Is the gallery public straight after, or embargoed?"},
+        {id:"s3", who:c.names, role:"client", at:t-240000,
+         text:"Public within a week. " + c.shooters + "."}
+      ];
+    },
+    async open(id){
+      this.close();
+      this.room = id; this.since = 0;
+      if(!this.local[id]) this.local[id] = this.seedFor(id);
+      this.paint(this.local[id]);
+      await this.pull();
+      this.timer = setInterval(() => this.pull(), 2500);
+    },
+    close(){ clearInterval(this.timer); this.timer = null; },
+    async pull(){
+      if(!this.room) return;
+      try{
+        const r = await fetch("api/chat/" + encodeURIComponent(this.room) + "?since=" + this.since);
+        if(!r.ok) throw 0;
+        const d = await r.json();
+        this.live = true; this.since = d.now;
+        if(d.messages.length){
+          this.local[this.room] = this.local[this.room].concat(d.messages);
+          this.paint(this.local[this.room]);
+        }
+      }catch(e){ this.live = false; }
+      const tag = $("chat-mode");
+      if(tag){
+        tag.textContent = this.live ? "Live" : "This browser only";
+        tag.className = "pill " + (this.live ? "live" : "");
+      }
+    },
+    async send(text){
+      const body = text.trim().slice(0,400);
+      if(!body || !this.room) return;
+      const who = session ? session.name : "You";
+      const role = session && session.role === "client" ? "client" : "brand";
+      if(this.live){
+        try{
+          await fetch("api/chat/" + encodeURIComponent(this.room), {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({who, role, text:body})
+          });
+          return this.pull();
+        }catch(e){ this.live = false; }
+      }
+      this.local[this.room].push({id:String(Date.now()), who, role, text:body, at:Date.now(), mine:true});
+      this.paint(this.local[this.room]);
+    },
+    paint(list){
+      const log = $("chat-log");
+      if(!log) return;
+      const me = session ? session.name : "You";
+      log.innerHTML = list.slice(-60).map(m => {
+        const mine = m.mine || m.who === me;
+        const ago = Math.max(0, Math.round((Date.now()-m.at)/60000));
+        return `<li class="${mine ? "me" : ""} ${m.role}">
+          <span class="w">${m.who}<small>${ago ? ago + "m ago" : "just now"}</small></span>
+          <span class="t">${m.text.replace(/[<>]/g, "")}</span></li>`;
+      }).join("");
+      log.scrollTop = log.scrollHeight;
+    }
+  };
+
+  /* ============================================================
      BROWSE
      ============================================================ */
   let filter = "all", search = "";
@@ -1670,6 +1767,7 @@
     syncQuote(null);
     renderListingStats();
     renderAudience(c);
+    CHAT.open(c.id);
   }
 
   /* What a brand is buying, stated as a workings rather than one vague number. */
@@ -1751,7 +1849,7 @@
     lstPlot.reprice();
   });
   $("lst-clear").addEventListener("click", () => lstPlot.clearSel());
-  $("back-browse").addEventListener("click", () => go("browse"));
+  $("back-browse").addEventListener("click", () => { CHAT.close(); go("browse"); });
 
   $("lst-submit").addEventListener("click", () => {
     const c = COUPLES.find(x => x.id === viewing), ev = lstPlot.sel;
@@ -1822,6 +1920,12 @@
      ============================================================ */
   window.addEventListener("scroll", () => $("nav").classList.toggle("stuck", window.scrollY > 8));
   bindEventEditor();
+  if($("chat-send")) $("chat-send").addEventListener("click", () => {
+    const i = $("chat-input"); CHAT.send(i.value); i.value = "";
+  });
+  if($("chat-input")) $("chat-input").addEventListener("keydown", e => {
+    if(e.key === "Enter"){ e.preventDefault(); const i = $("chat-input"); CHAT.send(i.value); i.value = ""; }
+  });
   PAY.init().then(() => {
     const tag = $("pay-mode");
     if(tag) tag.textContent = PAY.live ? "Live payments" : "Demo mode";

@@ -153,6 +153,40 @@ and it takes real money.
 `.env` is gitignored. `helmet` sets a CSP that admits Stripe and nothing else; `/api` is
 rate limited.
 
+
+## Going live with real users
+
+**Use Supabase.** It is the shortest path: the free tier is Postgres + Auth + Realtime +
+Storage, and Row Level Security lets the browser talk to the database directly, so there
+is no backend to deploy for the marketplace itself. Realtime gives live bidding and live
+chat over websockets instead of polling.
+
+| Need | Supabase gives you | Work |
+|---|---|---|
+| Real accounts | Auth (email link, Google, Apple) | a few lines |
+| Live bidding + chat | Realtime subscriptions on `bids`, `claims`, `messages` | a subscribe call |
+| Photo uploads | Storage bucket | swap the FileReader for an upload |
+| Taking money | Edge Function holding the Stripe secret | port `server/index.js` |
+
+Why not the alternatives: GitHub has no hosted database (Pages is static only). Firebase
+works but is document-shaped, which fights the per-cell market maths. Neon or PlanetScale
+give a database but no auth, realtime or storage, so you would build three more things.
+
+**Steps:** create a project, run `supabase/schema.sql` in the SQL editor, put the project
+URL and anon key in `.env`, host the static page anywhere free (Vercel, Netlify, or the
+GitHub Pages of this repo). The anon key is safe in the browser - RLS is the protection,
+which is why the schema ships with policies rather than leaving them to be added later.
+
+Keep the money rule wherever it ends up: **recompute the amount server-side** from the
+listing's own `floor_rate` and `min_area`, exactly as `server/index.js` does now.
+
+## Live chat
+
+One room per listing, beside the bidding. The server keeps rooms in memory
+(`GET/POST /api/chat/:id`) and the client polls every 2.5s; with no server it falls back
+to a browser-local conversation so the demo still reads. Move it to the `messages` table
+above and it becomes realtime and multi-user with no UI change.
+
 ## Files
 
 | File | What it is |

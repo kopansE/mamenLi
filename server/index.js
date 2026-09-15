@@ -153,6 +153,37 @@ app.post("/api/checkout", async (req, res) => {
   }
 });
 
+/* ------------------------------------------------------------------ chat
+   One room per listing. In memory, which is fine for a demo and for a single
+   process - move to Supabase (see supabase/schema.sql) for real users. */
+const CHATS = new Map();
+const CHAT_CAP = 200;
+const clean = t => String(t).replace(/[<>]/g, "").trim().slice(0, 400);
+
+app.get("/api/chat/:id", (req, res) => {
+  const room = CHATS.get(req.params.id) || [];
+  const since = Number(req.query.since) || 0;
+  res.json({ messages: room.filter(m => m.at > since), now: Date.now() });
+});
+
+app.post("/api/chat/:id", (req, res) => {
+  const { who, role, text } = req.body || {};
+  const body = clean(text || "");
+  if (!body) return res.status(400).json({ error: "Empty message." });
+  if (typeof who !== "string" || !who.trim()) return res.status(400).json({ error: "Who?" });
+  const room = CHATS.get(req.params.id) || [];
+  const msg = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    who: clean(who).slice(0, 60),
+    role: role === "client" ? "client" : "brand",
+    text: body,
+    at: Date.now(),
+  };
+  room.push(msg);
+  CHATS.set(req.params.id, room.slice(-CHAT_CAP));
+  res.json({ message: msg });
+});
+
 /* ---------------------------------------------------------------- the site */
 app.use(express.static(ROOT, { extensions: ["html"] }));
 app.get("/", (_req, res) => res.sendFile(path.join(ROOT, "squareinch.html")));

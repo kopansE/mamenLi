@@ -164,13 +164,28 @@ EXTRA = r'''
      A solid of revolution built from the same profile the market uses,
      so the thing you spin is the thing you bid on. Drag to rotate.
      ============================================================ */
-  const HERO_PANELS = [
-    {v:0.30, a:0.00,        name:"BODICE",  area:28, rate:24.00, col:"#FF2E93"},
-    {v:0.45, a:0.95,        name:"SASH",    area:22, rate:19.00, col:"#C08BFF"},
-    {v:0.66, a:-0.85,       name:"SKIRT L", area:64, rate:11.00, col:"#2BE8C5"},
-    {v:0.88, a:0.25,        name:"TRAIN",   area:96, rate:14.50, col:"#FFAE2B"},
-    {v:0.55, a:Math.PI,     name:"BACK",    area:40, rate:12.50, col:"#C6F32B"}
-  ];
+  /* ------------------------------------------------------------------
+     The example sponsors shown on the hero. These are invented names.
+     Swap them for whatever you like - the strings are the only thing
+     that changes; areas, rates and placement all still work.
+     ------------------------------------------------------------------ */
+  const HERO_SETS = {
+    gown: [
+      {v:0.30, a:0.00,    brand:"VELOUR",     zone:"BODICE",  area:28, rate:24.00, col:"#FF2E93"},
+      {v:0.45, a:0.95,    brand:"HALCYON",    zone:"SASH",    area:22, rate:19.00, col:"#C08BFF"},
+      {v:0.66, a:-0.85,   brand:"CAFFEINA",   zone:"SKIRT",   area:64, rate:11.00, col:"#2BE8C5"},
+      {v:0.88, a:0.25,    brand:"NIMBUS AIR", zone:"TRAIN",   area:96, rate:14.50, col:"#FFAE2B"},
+      {v:0.55, a:Math.PI, brand:"ORBIT",      zone:"BACK",    area:40, rate:12.50, col:"#C6F32B"}
+    ],
+    suit: [
+      {v:0.25, a:-0.42,   brand:"FERROUS",    zone:"LAPEL",   area:12, rate:28.00, col:"#C08BFF"},
+      {v:0.40, a:0.30,    brand:"TRUSS",      zone:"CHEST",   area:26, rate:23.00, col:"#FF2E93"},
+      {v:0.46, a:1.52,    brand:"PEMBERTON",  zone:"SLEEVE",  area:30, rate:13.00, col:"#2BE8C5"},
+      {v:0.82, a:-0.30,   brand:"GRINDHAUS",  zone:"TROUSER", area:54, rate:10.50, col:"#FFAE2B"},
+      {v:0.34, a:Math.PI, brand:"MELLOWFIELD",zone:"BACK",    area:44, rate:12.00, col:"#C6F32B"}
+    ]
+  };
+  const HERO_PANELS = HERO_SETS.gown;   /* the drop-in .glb path uses these */
 
   function patchTexture(p){
     const c = document.createElement("canvas");
@@ -185,10 +200,11 @@ EXTRA = r'''
     x.textAlign = "center";
     x.fillStyle = p.col;
     x.font = "700 52px 'IBM Plex Mono', monospace";
-    x.fillText(p.name, 256, 62);
+    x.fillText(p.brand || p.name, 256, 62);
     x.fillStyle = "#EFE4F8";
-    x.font = "500 36px 'IBM Plex Mono', monospace";
-    x.fillText(p.area + " in\u00b2  \u00b7  " + money(p.area * p.rate), 256, 112);
+    x.font = "500 34px 'IBM Plex Mono', monospace";
+    x.fillText((p.zone ? p.zone + "  \u00b7  " : "") + p.area + " in\u00b2  \u00b7  " +
+               money(p.area * p.rate), 256, 112);
     const t = new THREE.CanvasTexture(c);
     t.anisotropy = 4;
     return t;
@@ -207,30 +223,19 @@ EXTRA = r'''
       if(v < 0.44) return mix(0.80, 0.46, (v-0.30)/0.14);
       return 0.46 + Math.pow((v-0.44)/0.545, 1.28) * (2.05-0.46);
     };
-    /* Fabric, not a cone. Vertical drape folds that open toward the hem,
-       a second slower wave so they are not mechanical, and a train at the back. */
+    /* Fabric, not a cone. */
     const FOLDS = 13, FOLDS2 = 5;
     const foldAmp = v => 0.085 * Math.pow(Math.max(0,(v-0.40))/0.585, 0.85) + 0.014;
     const trainAt = (v, th) => {
-      const dist = Math.PI - Math.abs(th);                 // 0 at the back
+      const dist = Math.PI - Math.abs(th);
       const across = Math.exp(-Math.pow(dist/0.80, 2));
       const down = Math.pow(Math.max(0,(v-0.70))/0.285, 1.6);
       return {r: 0.95*across*down, y: -0.30*across*down};
     };
-    /* radius of the finished surface at (height, angle) */
     const surfR = (v, th) => {
       const base = rAt(v), a = foldAmp(v);
       const w = Math.sin(FOLDS*th + v*1.6) * a + Math.sin(FOLDS2*th - v*0.9) * a * 0.45;
       return base * (1 + w) + trainAt(v, th).r;
-    };
-
-    /* outward surface normal at v, in the (radius, height) plane */
-    const normAt = v => {
-      const d = 0.008;
-      const dr = rAt(Math.min(V_HEM,v+d)) - rAt(Math.max(V_TOP,v-d));
-      const dy = yAt(Math.min(V_HEM,v+d)) - yAt(Math.max(V_TOP,v-d));
-      const nr = -dy, ny = dr, L = Math.hypot(nr, ny) || 1;
-      return {r:nr/L, y:ny/L};
     };
 
     const scene = new THREE.Scene();
@@ -246,14 +251,11 @@ EXTRA = r'''
 
     const gl = new THREE.WebGLRenderer({antialias:true, alpha:true});
     gl.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    /* without these the silk clips to flat white and every fold disappears */
     gl.outputEncoding = THREE.sRGBEncoding;
     gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = 1.05;
     gl.physicallyCorrectLights = true;
 
-    /* A real environment map is the single biggest realism lever for satin -
-       without reflections cloth reads as flat CG. Generated in-process, no asset. */
     let envMap = null;
     if(THREE.PMREMGenerator && THREE.RoomEnvironment){
       const pmrem = new THREE.PMREMGenerator(gl);
@@ -266,81 +268,206 @@ EXTRA = r'''
     scene.add(rig);
     if(envMap) scene.environment = envMap;
 
-    /* the gown */
-    const pts = [];
-    for(let k=0;k<=72;k++){
-      const v = V_TOP + (V_HEM - V_TOP) * k/72;
-      pts.push(new THREE.Vector2(Math.max(0.02, rAt(v)), yAt(v)));
-    }
-    const geo = new THREE.LatheGeometry(pts, 168);
-    (function drape(){
-      const P = geo.attributes.position, yTop = Y_TOP, yHem = Y_HEM;
-      for(let i=0;i<P.count;i++){
-        const x = P.getX(i), y = P.getY(i), z = P.getZ(i);
-        const r0 = Math.hypot(x, z);
-        if(r0 < 1e-4) continue;
-        const th = Math.atan2(x, z);
-        const v = V_TOP + (yTop - y) / (yTop - yHem) * (V_HEM - V_TOP);
-        const r = surfR(v, th), t = trainAt(v, th);
-        /* sweetheart dip at the very top */
-        const dip = v < V_TOP + 0.012 ? -0.11 * Math.pow(Math.cos(th), 2) : 0;
-        P.setXYZ(i, Math.sin(th)*r, y + t.y + dip, Math.cos(th)*r);
-      }
-      P.needsUpdate = true;
-      geo.computeVertexNormals();
-    })();
-
     const silkMat = new THREE.MeshPhysicalMaterial({
       color:0xEDE2F0, roughness:.38, metalness:.0,
       clearcoat:.65, clearcoatRoughness:.28, envMapIntensity:1.2,
       side:THREE.DoubleSide, flatShading:false
     });
-    const gown = new THREE.Mesh(geo, silkMat);
-    rig.add(gown);
-
-    /* a satin band at the waist - small detail, big believability */
-    const waistV = 0.44, sash = new THREE.Mesh(
-      new THREE.TorusGeometry(rAt(waistV)*1.01, .045, 12, 96),
-      new THREE.MeshPhysicalMaterial({color:0xE6D4F2, roughness:.3, metalness:.15, clearcoat:.7})
-    );
-    sash.rotation.x = Math.PI/2; sash.position.y = yAt(waistV); rig.add(sash);
-
-    /* a hem disc so the skirt doesn't read as hollow */
-    const hem = new THREE.Mesh(
-      new THREE.CircleGeometry(rAt(V_HEM)*0.99, 96),
-      new THREE.MeshStandardMaterial({color:0xC6B2D8, roughness:.9, side:THREE.DoubleSide})
-    );
-    hem.rotation.x = Math.PI/2; hem.position.y = yAt(V_HEM) + .02;
-    rig.add(hem);
-
-    /* a couture dress form: rounded bust cap, no head - reads as product, not cartoon */
-    const cap = new THREE.Mesh(
-      new THREE.SphereGeometry(rAt(V_TOP)*0.995, 64, 40, 0, Math.PI*2, 0, Math.PI*0.5), silkMat);
-    cap.scale.set(1, 0.66, 1); cap.position.y = Y_TOP - .03; rig.add(cap);
-
-    /* the stand it sits on */
-    const steel = new THREE.MeshStandardMaterial({color:0x6E5A82, roughness:.35, metalness:.75});
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.9,24), steel);
-    post.position.y = Y_HEM - .42; rig.add(post);
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(.62,.72,.1,48), steel);
-    base.position.y = Y_HEM - .9; rig.add(base);
-
-    /* sponsor panels, sitting on the surface and turning with it */
-    HERO_PANELS.forEach(p => {
-      const r = rAt(p.v), y = yAt(p.v);
-      const m = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.12, 0.335),
-        new THREE.MeshBasicMaterial({map:patchTexture(p), transparent:true, side:THREE.DoubleSide})
-      );
-      /* clear the fold ridges, otherwise the panel sinks into the fabric */
-      const n = normAt(p.v), off = .07 + foldAmp(p.v) * rAt(p.v) * 1.25;
-      const rr = surfR(p.v, p.a) + n.r*off;
-      const ty = trainAt(p.v, p.a).y;
-      const x = Math.sin(p.a) * rr, z = Math.cos(p.a) * rr;
-      m.position.set(x, y + ty + n.y*off, z);
-      m.lookAt(x + Math.sin(p.a)*n.r*3, y + ty + n.y*off + n.y*3, z + Math.cos(p.a)*n.r*3);
-      rig.add(m);
+    const woolMat = new THREE.MeshPhysicalMaterial({
+      color:0x2E2B46, roughness:.72, metalness:.02,
+      clearcoat:.18, clearcoatRoughness:.6, envMapIntensity:.85
     });
+    const shirtMat = new THREE.MeshPhysicalMaterial({color:0xF2EEF8, roughness:.5, clearcoat:.3});
+    const tieMat   = new THREE.MeshPhysicalMaterial({color:0x8E2B5E, roughness:.35, clearcoat:.6});
+    const steel    = new THREE.MeshStandardMaterial({color:0x6E5A82, roughness:.35, metalness:.75});
+
+    /* ---------------------------------------------------------- the gown */
+    function buildGown(){
+      const g = new THREE.Group();
+      const pts = [];
+      for(let k=0;k<=72;k++){
+        const v = V_TOP + (V_HEM - V_TOP) * k/72;
+        pts.push(new THREE.Vector2(Math.max(0.02, rAt(v)), yAt(v)));
+      }
+      const geo = new THREE.LatheGeometry(pts, 168);
+      const P = geo.attributes.position;
+      for(let i=0;i<P.count;i++){
+        const x = P.getX(i), y = P.getY(i), z = P.getZ(i);
+        const r0 = Math.hypot(x, z);
+        if(r0 < 1e-4) continue;
+        const th = Math.atan2(x, z);
+        const v = V_TOP + (Y_TOP - y) / (Y_TOP - Y_HEM) * (V_HEM - V_TOP);
+        const r = surfR(v, th), t = trainAt(v, th);
+        const dip = v < V_TOP + 0.012 ? -0.11 * Math.pow(Math.cos(th), 2) : 0;
+        P.setXYZ(i, Math.sin(th)*r, y + t.y + dip, Math.cos(th)*r);
+      }
+      P.needsUpdate = true;
+      geo.computeVertexNormals();
+      g.add(new THREE.Mesh(geo, silkMat));
+
+      const hem = new THREE.Mesh(new THREE.CircleGeometry(rAt(V_HEM)*0.99, 96),
+        new THREE.MeshStandardMaterial({color:0xC6B2D8, roughness:.9, side:THREE.DoubleSide}));
+      hem.rotation.x = Math.PI/2; hem.position.y = yAt(V_HEM) + .02; g.add(hem);
+
+      const waistV = 0.44;
+      const sash = new THREE.Mesh(new THREE.TorusGeometry(rAt(waistV)*1.01, .045, 12, 96),
+        new THREE.MeshPhysicalMaterial({color:0xE6D4F2, roughness:.3, metalness:.15, clearcoat:.7}));
+      sash.rotation.x = Math.PI/2; sash.position.y = yAt(waistV); g.add(sash);
+
+      const cap = new THREE.Mesh(
+        new THREE.SphereGeometry(rAt(V_TOP)*0.995, 64, 40, 0, Math.PI*2, 0, Math.PI*0.5), silkMat);
+      cap.scale.set(1, 0.66, 1); cap.position.y = Y_TOP - .03; g.add(cap);
+      return g;
+    }
+
+    /* ---------------------------------------------------------- the suit */
+    const S_A = 0.150, S_B = 0.985, SY_TOP = 1.50, SY_BOT = -2.00;
+    const sy = v => SY_TOP - (v - S_A) / (S_B - S_A) * (SY_TOP - SY_BOT);
+    /* a torso, not a tube: collar, shoulders, chest, waist */
+    const S_JACKET = 0.605;
+    function torso3D(v){
+      if(v < 0.198) return mix(0.24, 0.30, (v-S_A)/0.048);
+      if(v < 0.268) return 0.30 + Math.sqrt((v-0.198)/0.070) * 0.55;   /* shoulders */
+      if(v < 0.470) return mix(0.85, 0.80, (v-0.268)/0.202);           /* chest */
+      if(v < 0.555) return mix(0.80, 0.755, (v-0.470)/0.085);          /* waist */
+      return mix(0.755, 0.83, (v-0.555)/0.050);                        /* jacket hem over the hips */
+    }
+
+    function buildSuit(){
+      const g = new THREE.Group();
+
+      /* jacket: a lathe squashed front-to-back so it reads as a body */
+      const pts = [];
+      for(let k=0;k<=70;k++){
+        const v = S_A + (S_JACKET - S_A) * k/70;
+        pts.push(new THREE.Vector2(Math.max(0.02, torso3D(v)), sy(v)));
+      }
+      const jacket = new THREE.Mesh(new THREE.LatheGeometry(pts, 96), woolMat);
+      jacket.scale.z = 0.62;
+      g.add(jacket);
+      const shoulderY = sy(0.268), hipY = sy(S_JACKET);
+
+      /* sleeves, with a shoulder joint so they read as attached */
+      [-1, 1].forEach(side => {
+        const jx = side * 0.70;
+        const joint = new THREE.Mesh(new THREE.SphereGeometry(0.235, 28, 20), woolMat);
+        joint.position.set(jx, shoulderY + 0.03, 0); joint.scale.z = 0.78; g.add(joint);
+
+        const len = 1.34;
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.225, 0.165, len, 28), woolMat);
+        const tilt = side * -0.10;
+        arm.rotation.z = tilt;
+        arm.position.set(jx + Math.sin(-tilt) * len/2, shoulderY + 0.03 - Math.cos(tilt)*len/2, 0);
+        arm.scale.z = 0.84;
+        g.add(arm);
+
+        const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.168, 0.162, 0.075, 24), shirtMat);
+        cuff.rotation.z = tilt;
+        cuff.position.set(jx + Math.sin(-tilt) * len, shoulderY + 0.03 - Math.cos(tilt)*len, 0);
+        cuff.scale.z = 0.84;
+        g.add(cuff);
+      });
+
+      /* trousers */
+      [-1, 1].forEach(side => {
+        const legTop = hipY + 0.12, legLen = legTop - SY_BOT;
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.335, 0.245, legLen, 30), woolMat);
+        leg.position.set(side * 0.385, legTop - legLen/2, 0);
+        leg.scale.z = 0.88;
+        g.add(leg);
+      });
+
+      /* shirt, lapels, tie, buttons - the bits that say suit */
+      const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.15, 0.06), shirtMat);
+      shirt.position.set(0, sy(0.345), 0.478); g.add(shirt);
+
+      [-1, 1].forEach(side => {
+        const lapel = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1.10, 0.05), woolMat);
+        lapel.position.set(side * 0.268, sy(0.350), 0.492);
+        lapel.rotation.z = side * 0.145;
+        g.add(lapel);
+      });
+
+      const knot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.075), tieMat);
+      knot.position.set(0, sy(0.232), 0.518); g.add(knot);
+      const tie = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.80, 0.06), tieMat);
+      tie.position.set(0, sy(0.350), 0.515); g.add(tie);
+
+      [0.495, 0.545].forEach(v => {
+        const b = new THREE.Mesh(new THREE.SphereGeometry(0.032, 16, 12),
+          new THREE.MeshStandardMaterial({color:0x14121F, roughness:.4, metalness:.3}));
+        b.position.set(0, sy(v), 0.50); g.add(b);
+      });
+
+      /* collar ring */
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.30, 0.045, 10, 48), shirtMat);
+      collar.rotation.x = Math.PI/2; collar.position.y = sy(0.198);
+      collar.scale.z = 0.68; g.add(collar);
+      return g;
+    }
+
+    function buildStand(){
+      const g = new THREE.Group();
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.9,24), steel);
+      post.position.y = SY_BOT - .42; g.add(post);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(.62,.72,.1,48), steel);
+      base.position.y = SY_BOT - .9; g.add(base);
+      return g;
+    }
+
+    /* panels land on whatever surface is actually there */
+    function placePanels(target, panels){
+      const box = new THREE.Box3().setFromObject(target);
+      const top = box.max.y, span = top - box.min.y;
+      panels.forEach(pn => {
+        const h = top - span * pn.v;
+        const from = new THREE.Vector3(Math.sin(pn.a)*14, h, Math.cos(pn.a)*14);
+        const dir = new THREE.Vector3(-Math.sin(pn.a), 0, -Math.cos(pn.a)).normalize();
+        const hit = new THREE.Raycaster(from, dir).intersectObject(target, true)[0];
+        if(!hit) return;
+        const nrm = hit.face
+          ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+          : dir.clone().negate();
+        const m = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.06, 0.318),
+          new THREE.MeshBasicMaterial({map:patchTexture(pn), transparent:true, side:THREE.DoubleSide})
+        );
+        m.position.copy(hit.point).addScaledVector(nrm, 0.055);
+        m.lookAt(m.position.clone().add(nrm));
+        rig.add(m);
+      });
+    }
+
+    let current = null, framed = null;
+    /* the gown is twice as wide as the suit, so fit the camera to each */
+    function frame(target){
+      if(!target) return;
+      const box = new THREE.Box3().setFromObject(target);
+      const size = box.getSize(new THREE.Vector3());
+      const mid = box.getCenter(new THREE.Vector3());
+      const vFov = cam.fov * Math.PI/180;
+      const forH = size.y / (2 * Math.tan(vFov/2));
+      const forW = (size.x * 1.12) / (2 * Math.tan(vFov/2) * cam.aspect);
+      const dist = Math.max(forH, forW) * 1.18;
+      cam.position.set(0, mid.y + size.y*0.05, dist);
+      cam.lookAt(0, mid.y, 0);
+    }
+    function show(which){
+      [...rig.children].forEach(c => rig.remove(c));
+      const body = which === "suit" ? buildSuit() : buildGown();
+      rig.add(body);
+      rig.add(buildStand());
+      applyEnv(rig);
+      placePanels(body, HERO_SETS[which] || HERO_SETS.gown);
+      framed = rig; frame(rig);
+      current = which;
+      const gb = $("hs-gown"), sb = $("hs-suit");
+      if(gb) gb.setAttribute("aria-selected", String(which === "gown"));
+      if(sb) sb.setAttribute("aria-selected", String(which === "suit"));
+    }
+    show("gown");
+    if($("hs-gown")) $("hs-gown").addEventListener("click", () => current !== "gown" && show("gown"));
+    if($("hs-suit")) $("hs-suit").addEventListener("click", () => current !== "suit" && show("suit"));
 
     /* light it like the page */
     scene.add(new THREE.HemisphereLight(0xCBAAF2, 0x1E0C31, .55));
@@ -368,73 +495,46 @@ EXTRA = r'''
       if(!w || !h) return;
       gl.setSize(w, h, false);
       cam.aspect = w/h; cam.updateProjectionMatrix();
+      frame(framed);
     }
     new ResizeObserver(size).observe(host);
     size();
 
     let visible = true;
-    new IntersectionObserver(es => visible = es[0].isIntersecting, {threshold:0})
-      .observe(host);
+    new IntersectionObserver(es => visible = es[0].isIntersecting, {threshold:0}).observe(host);
 
     (function loop(){
       requestAnimationFrame(loop);
       if(!visible) return;
-      if(!drag){
-        if(!reduced){
-          idle += 1;
-          const target = idle > 45 ? 0.0045 : vel;
-          vel += (target - vel) * 0.04;
-          rig.rotation.y += vel;
-        }
+      if(!drag && !reduced){
+        idle += 1;
+        const target = idle > 45 ? 0.0045 : vel;
+        vel += (target - vel) * 0.04;
+        rig.rotation.y += vel;
       }
       gl.render(scene, cam);
     })();
 
     /* ------------------------------------------------------------------
-       Drop a real gown at assets/gown.glb and it replaces everything above.
-       Panels are then placed by raycasting onto the actual mesh, so they lie
-       on the real dress wherever its surface happens to be.
+       Drop a real model at assets/gown.glb and it replaces everything above.
        ------------------------------------------------------------------ */
     (function tryRealModel(){
       if(!THREE.GLTFLoader) return;
       new THREE.GLTFLoader().load("assets/gown.glb", g => {
         const model = g.scene || g.scenes[0];
         if(!model) return;
-
-        /* frame it exactly like the procedural one */
         const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
+        const size2 = box.getSize(new THREE.Vector3());
         const mid = box.getCenter(new THREE.Vector3());
-        const k = 3.9 / (size.y || 1);
+        const k = 3.9 / (size2.y || 1);
         model.scale.setScalar(k);
         model.position.set(-mid.x*k, -mid.y*k - 0.15, -mid.z*k);
         applyEnv(model);
-
-        /* out with the stand-in */
         [...rig.children].forEach(c => rig.remove(c));
         rig.add(model);
-
-        /* lay the sponsor panels on the real surface */
-        const fitted = new THREE.Box3().setFromObject(model);
-        const top = fitted.max.y, bot = fitted.min.y, span = top - bot;
-        HERO_PANELS.forEach(pn => {
-          const h = top - span * ((pn.v - V_TOP) / (V_HEM - V_TOP)) * 0.94 - span*0.03;
-          const from = new THREE.Vector3(Math.sin(pn.a)*14, h, Math.cos(pn.a)*14);
-          const dir = new THREE.Vector3(-Math.sin(pn.a), 0, -Math.cos(pn.a)).normalize();
-          const hit = new THREE.Raycaster(from, dir).intersectObject(model, true)[0];
-          if(!hit) return;
-          const nrm = hit.face
-            ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
-            : dir.clone().negate();
-          const m = new THREE.Mesh(
-            new THREE.PlaneGeometry(1.05, 0.315),
-            new THREE.MeshBasicMaterial({map:patchTexture(pn), transparent:true, side:THREE.DoubleSide})
-          );
-          m.position.copy(hit.point).addScaledVector(nrm, 0.035);
-          m.lookAt(m.position.clone().add(nrm));
-          rig.add(m);
-        });
-      }, undefined, () => { /* no model on disk - the procedural gown stays */ });
+        placePanels(model, HERO_SETS[current] || HERO_SETS.gown);
+        framed = rig; frame(rig);
+      }, undefined, () => { /* no model on disk - the built-in ones stay */ });
     })();
 
     host.insertAdjacentHTML("beforeend",
@@ -448,14 +548,23 @@ EXTRA = r'''
     const el = $("hero-flat");
     if(!el) return;
     el.style.cursor = "default";
-    el.insertAdjacentHTML("afterbegin", gownSVG());
-    HERO_PANELS.filter(p => p.name !== "BACK").forEach((p,i) => {
-      const x = 50 + Math.sin(p.a) * 16;
-      el.insertAdjacentHTML("beforeend",
-        `<span class="hp" style="left:${x}%;top:${p.v*100}%;animation-delay:${0.5 + i*0.14}s;
-           border-color:${p.col};color:${p.col}">
-           ${p.name} &middot; ${p.area} in&sup2; &middot; <b>${money(p.area*p.rate)}</b></span>`);
-    });
+    const draw = which => {
+      el.querySelectorAll(".hp, svg").forEach(n => n.remove());
+      el.insertAdjacentHTML("afterbegin", which === "suit" ? "" : gownSVG());
+      (HERO_SETS[which] || HERO_SETS.gown).filter(p => p.zone !== "BACK").forEach((p,i) => {
+        const x = 50 + Math.sin(p.a) * 16;
+        el.insertAdjacentHTML("beforeend",
+          `<span class="hp" style="left:${x}%;top:${p.v*100}%;animation-delay:${0.4 + i*0.14}s;
+             border-color:${p.col};color:${p.col}">
+             ${p.brand} &middot; ${p.area} in&sup2; &middot; <b>${money(p.area*p.rate)}</b></span>`);
+      });
+      const gb = $("hs-gown"), sb = $("hs-suit");
+      if(gb) gb.setAttribute("aria-selected", String(which === "gown"));
+      if(sb) sb.setAttribute("aria-selected", String(which === "suit"));
+    };
+    draw("gown");
+    if($("hs-gown")) $("hs-gown").addEventListener("click", () => draw("gown"));
+    if($("hs-suit")) $("hs-suit").addEventListener("click", () => draw("suit"));
   }
 
   function heroArt(){ if(!hero3D()) heroFlatFallback(); }
