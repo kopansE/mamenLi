@@ -41,12 +41,22 @@ Motion: the headline assembles word by word and a white highlighter sweeps acros
 rate-card heat bars fill, holders land with a spring, and confetti fires when you take
 ground off a rival. All of it respects `prefers-reduced-motion`.
 
-**The hero gown is real 3D.** It is a solid of revolution built with three.js from a
-bust-waist-hem profile, on a mannequin stand, lit with the page's own magenta and aqua.
-Drag it to spin; let go and it keeps turning. The sponsor panels are textured planes
-sitting flush on the surface along the true surface normal, so they wrap with the dress -
-including one on the back you only find by spinning it. If three.js or WebGL is
-unavailable the hero falls back to the flat SVG gown automatically.
+**The hero gown is real 3D.** Built with three.js on a mannequin stand: a
+bust-waist-hem profile turned into a surface, then displaced into draped satin - two
+overlaid fold waves that open toward the hem, a scalloped hem edge, a satin waist sash,
+and a cathedral train that sweeps out at the back (spin it to see it). Rendered with
+ACES tone mapping and sRGB output, because without those the silk clips to flat white
+and every fold disappears.
+
+Drag to spin; let go and it keeps turning. The sponsor panels are textured planes placed
+along the true surface normal and lifted clear of the fold ridges, so they sit flush and
+wrap with the dress - including one on the back you only find by spinning it. If WebGL
+or the CDN is unavailable the hero falls back to the flat SVG gown automatically.
+
+**On using a scanned/real gown model:** every CC0 source checked (Meshy, Sketchfab)
+gates downloads behind a free account, and Poly Pizza's only dress is a low-poly game
+character. If you download a `.glb` yourself, drop it in this folder and it can be wired
+in with GLTFLoader and embedded in the page.
 
 The flow:
 
