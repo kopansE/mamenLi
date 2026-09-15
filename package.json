@@ -1,0 +1,12 @@
+{
+  "name": "square-inch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sponsorship marketplace for wedding gowns and suits, priced by the square inch",
+  "scripts": {
+    "setup": "npm --prefix server install",
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": { "node": ">=18" }
+}

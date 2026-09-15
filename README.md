@@ -133,12 +133,14 @@ garment restarts bidding, because the shape - and therefore what anyone bought -
 Card details never touch the page. The server creates a **Stripe Checkout Session** and
 the browser is handed to Stripe's hosted page; the secret key stays on the server.
 
-```
-cp .env.example .env     # already done - the keys are blank, fill them in
-cd server && npm install && npm start
+```powershell
+npm run setup    # installs the server's dependencies, once
+npm start        # http://localhost:8787
 ```
 
-Then open `http://localhost:8787`. With blank keys everything still runs and the
+Run those from the **project root**. `.env` is read from the root whichever directory
+you start from. If the port is taken, something is already listening on 8787 - stop it
+or change `PORT` in `.env`. With blank keys everything still runs and the
 checkout drops to **demo mode**; add `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY`
 and it takes real money.
 

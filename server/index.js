@@ -9,9 +9,10 @@
  * simply reports that payments are not configured, and the front end drops
  * into demo mode.
  */
-require("dotenv").config();
-
 const path = require("path");
+
+/* load .env from the project root, whichever directory npm was run from */
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const express = require("express");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
