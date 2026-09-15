@@ -234,6 +234,12 @@ EXTRA = r'''
     };
 
     const scene = new THREE.Scene();
+    const applyEnv = o => o.traverse(n => {
+      if(n.isMesh && n.material && "envMapIntensity" in n.material){
+        n.material.envMap = envMap; n.material.envMapIntensity = 1.15;
+        n.material.needsUpdate = true;
+      }
+    });
     const cam = new THREE.PerspectiveCamera(30, 3/4, 0.1, 100);
     cam.position.set(0, 0.30, 12.1);
     cam.lookAt(0, -0.42, 0);
@@ -244,10 +250,21 @@ EXTRA = r'''
     gl.outputEncoding = THREE.sRGBEncoding;
     gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = 1.05;
+    gl.physicallyCorrectLights = true;
+
+    /* A real environment map is the single biggest realism lever for satin -
+       without reflections cloth reads as flat CG. Generated in-process, no asset. */
+    let envMap = null;
+    if(THREE.PMREMGenerator && THREE.RoomEnvironment){
+      const pmrem = new THREE.PMREMGenerator(gl);
+      pmrem.compileEquirectangularShader();
+      envMap = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+    }
     host.appendChild(gl.domElement);
 
     const rig = new THREE.Group();
     scene.add(rig);
+    if(envMap) scene.environment = envMap;
 
     /* the gown */
     const pts = [];
@@ -274,8 +291,8 @@ EXTRA = r'''
     })();
 
     const silkMat = new THREE.MeshPhysicalMaterial({
-      color:0xEFE4F2, roughness:.62, metalness:.0,
-      clearcoat:.4, clearcoatRoughness:.5,
+      color:0xEDE2F0, roughness:.38, metalness:.0,
+      clearcoat:.65, clearcoatRoughness:.28, envMapIntensity:1.2,
       side:THREE.DoubleSide, flatShading:false
     });
     const gown = new THREE.Mesh(geo, silkMat);
@@ -371,6 +388,53 @@ EXTRA = r'''
         }
       }
       gl.render(scene, cam);
+    })();
+
+    /* ------------------------------------------------------------------
+       Drop a real gown at assets/gown.glb and it replaces everything above.
+       Panels are then placed by raycasting onto the actual mesh, so they lie
+       on the real dress wherever its surface happens to be.
+       ------------------------------------------------------------------ */
+    (function tryRealModel(){
+      if(!THREE.GLTFLoader) return;
+      new THREE.GLTFLoader().load("assets/gown.glb", g => {
+        const model = g.scene || g.scenes[0];
+        if(!model) return;
+
+        /* frame it exactly like the procedural one */
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const mid = box.getCenter(new THREE.Vector3());
+        const k = 3.9 / (size.y || 1);
+        model.scale.setScalar(k);
+        model.position.set(-mid.x*k, -mid.y*k - 0.15, -mid.z*k);
+        applyEnv(model);
+
+        /* out with the stand-in */
+        [...rig.children].forEach(c => rig.remove(c));
+        rig.add(model);
+
+        /* lay the sponsor panels on the real surface */
+        const fitted = new THREE.Box3().setFromObject(model);
+        const top = fitted.max.y, bot = fitted.min.y, span = top - bot;
+        HERO_PANELS.forEach(pn => {
+          const h = top - span * ((pn.v - V_TOP) / (V_HEM - V_TOP)) * 0.94 - span*0.03;
+          const from = new THREE.Vector3(Math.sin(pn.a)*14, h, Math.cos(pn.a)*14);
+          const dir = new THREE.Vector3(-Math.sin(pn.a), 0, -Math.cos(pn.a)).normalize();
+          const hit = new THREE.Raycaster(from, dir).intersectObject(model, true)[0];
+          if(!hit) return;
+          const nrm = hit.face
+            ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+            : dir.clone().negate();
+          const m = new THREE.Mesh(
+            new THREE.PlaneGeometry(1.05, 0.315),
+            new THREE.MeshBasicMaterial({map:patchTexture(pn), transparent:true, side:THREE.DoubleSide})
+          );
+          m.position.copy(hit.point).addScaledVector(nrm, 0.035);
+          m.lookAt(m.position.clone().add(nrm));
+          rig.add(m);
+        });
+      }, undefined, () => { /* no model on disk - the procedural gown stays */ });
     })();
 
     host.insertAdjacentHTML("beforeend",

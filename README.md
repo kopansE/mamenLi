@@ -53,10 +53,22 @@ along the true surface normal and lifted clear of the fold ridges, so they sit f
 wrap with the dress - including one on the back you only find by spinning it. If WebGL
 or the CDN is unavailable the hero falls back to the flat SVG gown automatically.
 
-**On using a scanned/real gown model:** every CC0 source checked (Meshy, Sketchfab)
-gates downloads behind a free account, and Poly Pizza's only dress is a low-poly game
-character. If you download a `.glb` yourself, drop it in this folder and it can be wired
-in with GLTFLoader and embedded in the page.
+### Using a real gown model
+
+**Drop a `.glb` at `assets/gown.glb` and the hero uses it automatically.** No code
+change. The page auto-scales and centres it, applies the environment map, and places the
+sponsor panels by **raycasting onto the actual mesh**, so they land on the real surface
+wherever it happens to be. If the file is absent, the procedural gown is used instead.
+The path was verified end to end with a Khronos sample model.
+
+To publish it as an artifact the file has to be published alongside the page - pass it as
+a supporting file rather than relying on the local folder.
+
+Why there isn't one in the repo: every CC0 source checked gates downloads behind a free
+account (Meshy, Sketchfab), Poly Pizza's only dress is a low-poly game character that
+would look *more* cartoonish, and Smithsonian Open Access - which does hold CC0 scans of
+real garments - sits behind bot verification. A licensed model has to come from a human
+with an account.
 
 The flow:
 
