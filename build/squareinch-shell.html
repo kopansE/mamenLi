@@ -12,6 +12,7 @@
     --dress:#FBF3FF; --dress-shade:#B08FC9; --skin:#E8C8AC;
     --mint:#2BE8C5; --gold:#FFAE2B; --wine:#FF2E93;   /* engine aliases */
     --ink:#FBF3FF; --hair:#4A2170;
+    color-scheme: dark;                      /* native menus, pickers and scrollbars */
     --glow-m:0 0 32px rgba(255,46,147,.45);
     --glow-a:0 0 32px rgba(43,232,197,.35);
   }
@@ -316,6 +317,14 @@
   .inp{width:100%;padding:13px 15px;border-radius:13px;border:1px solid var(--edge-soft);
     background:rgba(255,255,255,.05);color:var(--text);font-size:.95rem;transition:.2s}
   .inp:focus{outline:none;border-color:var(--aqua);background:rgba(43,232,197,.08)}
+  /* a translucent select renders its popup white-on-white, so give it real colour */
+  select.inp{background-color:#2C1246;appearance:none;padding-right:38px;
+    background-image:linear-gradient(45deg,transparent 50%,var(--soft) 50%),
+                     linear-gradient(135deg,var(--soft) 50%,transparent 50%);
+    background-position:calc(100% - 20px) 52%, calc(100% - 14px) 52%;
+    background-size:6px 6px, 6px 6px; background-repeat:no-repeat}
+  select.inp option{background:#2C1246;color:var(--text)}
+  select.inp:focus{background-color:#38185A}
   .inp::placeholder{color:var(--soft);opacity:.7}
   .swap{margin-top:16px;font-size:.88rem;color:var(--soft);text-align:center}
   .swap button{color:var(--amber);font-weight:700}
@@ -445,6 +454,53 @@
     border-top:1px solid var(--edge-soft);margin-top:11px;padding-top:11px}
   .qtot b{font-family:"Bodoni Moda",serif;font-size:1.7rem;font-weight:600;color:var(--amber);
     font-variant-numeric:tabular-nums}
+
+  /* ---------- listing numbers ---------- */
+  .kpis{display:flex;gap:14px;margin-top:11px;flex-wrap:wrap}
+  .kpis span{display:flex;flex-direction:column;font-family:"IBM Plex Mono",monospace;
+    font-size:.58rem;letter-spacing:.11em;text-transform:uppercase;color:var(--soft)}
+  .kpis b{font-family:"Outfit",sans-serif;font-size:.98rem;letter-spacing:0;
+    text-transform:none;color:var(--text)}
+  .arow{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    padding:9px 0;border-bottom:1px solid var(--edge-soft);font-size:.88rem}
+  .arow:last-child{border-bottom:0}
+  .arow small{display:block;color:var(--soft);font-size:.74rem;margin-top:1px}
+  .arow b{font-family:"IBM Plex Mono",monospace;font-weight:600;white-space:nowrap;text-align:right}
+  .arow.cpm b{color:var(--aqua);font-size:1.05rem}
+  .asplit{height:1px;background:var(--edge);margin:10px 0}
+  .atot{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    border-top:1px solid var(--edge);margin-top:10px;padding-top:12px}
+  .atot span{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--soft)}
+  .atot b{font-family:"Bodoni Moda",serif;font-size:1.65rem;font-weight:600;color:var(--amber)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:520px){.grid2{grid-template-columns:1fr}}
+  .check{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:13px;
+    border:1px solid var(--edge-soft);background:rgba(255,255,255,.04);font-size:.9rem;cursor:pointer}
+  .check input{accent-color:var(--magenta);width:17px;height:17px}
+
+  /* ---------- payment ---------- */
+  .modal{position:fixed;inset:0;z-index:95;display:grid;place-items:center;padding:22px;
+    background:rgba(11,4,20,.72)}
+  .modal .sheet{width:min(460px,100%);border-radius:24px;padding:28px;
+    background:rgba(42,16,67,.96);border:1px solid var(--edge);
+    box-shadow:0 40px 90px -36px rgba(0,0,0,.95)}
+  .modal h3{font-family:"Bodoni Moda",serif;font-size:1.6rem;font-weight:600}
+  .modal .sub{color:var(--soft);font-size:.86rem;margin-top:5px}
+  .prow{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:.9rem}
+  .prow b{font-family:"IBM Plex Mono",monospace;font-weight:600}
+  .ptot{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    border-top:1px solid var(--edge);margin-top:10px;padding-top:12px}
+  .ptot span{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--soft)}
+  .ptot b{font-family:"Bodoni Moda",serif;font-size:1.8rem;font-weight:600;color:var(--amber)}
+  .pnote{margin-top:14px;font-size:.8rem;color:var(--soft);line-height:1.5}
+  .pnote code{font-family:"IBM Plex Mono",monospace;color:var(--aqua)}
+  .pstatus{margin-top:10px;font-size:.82rem;color:var(--aqua);min-height:1.2em;text-align:center}
+  .secure{display:inline-flex;align-items:center;gap:7px;font-family:"IBM Plex Mono",monospace;
+    font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--soft);margin-top:14px}
+  .secure svg{width:13px;height:13px;color:var(--aqua)}
 
   /* ---------- toast ---------- */
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:90;max-width:min(94vw,540px);
@@ -709,6 +765,44 @@
           </div>
         </div>
 
+        <div class="card">
+          <div class="hd"><h3>What brands will see</h3><span class="pill live">Your numbers</span></div>
+          <div class="bd">
+            <div class="fld"><label for="ev-garment">What you're listing</label>
+              <select class="inp" id="ev-garment">
+                <option value="gown">A wedding gown</option>
+                <option value="suit">A suit</option>
+              </select></div>
+            <div class="grid2">
+              <div class="fld"><label for="ev-invited">Invited</label>
+                <input class="inp" id="ev-invited" type="number" min="0"></div>
+              <div class="fld"><label for="ev-confirmed">Confirmed</label>
+                <input class="inp" id="ev-confirmed" type="number" min="0"></div>
+            </div>
+            <div class="fld"><label for="ev-venue">Venue</label>
+              <input class="inp" id="ev-venue" type="text"></div>
+            <div class="grid2">
+              <div class="fld"><label for="ev-venuetype">Venue type</label>
+                <input class="inp" id="ev-venuetype" type="text"></div>
+              <div class="fld"><label for="ev-gallery">Gallery</label>
+                <input class="inp" id="ev-gallery" type="text"></div>
+            </div>
+            <div class="fld"><label for="ev-shooters">Who's shooting it</label>
+              <input class="inp" id="ev-shooters" type="text"></div>
+            <div class="grid2">
+              <div class="fld"><label for="ev-reach">Combined social reach</label>
+                <input class="inp" id="ev-reach" type="number" min="0"></div>
+              <div class="fld"><label for="ev-hashtag">Hashtag</label>
+                <input class="inp" id="ev-hashtag" type="text"></div>
+            </div>
+            <div class="fld"><label for="ev-press">Press</label>
+              <input class="inp" id="ev-press" type="text"></div>
+            <label class="check" for="ev-live">
+              <input type="checkbox" id="ev-live"> Being livestreamed</label>
+            <div style="margin-top:16px" id="ev-audience"></div>
+          </div>
+        </div>
+
         <div class="card" id="cl-settings">
           <div class="hd"><h3>My terms</h3></div>
           <div class="bd">
@@ -795,13 +889,39 @@
         </div>
 
         <div class="card">
+          <div class="hd"><h3>What you're buying</h3><span class="pill you" id="pay-mode">Demo mode</span></div>
+          <div class="bd" id="lst-audience"></div>
+        </div>
+
+        <div class="card">
           <div class="hd"><h3>Who holds what</h3></div>
           <div style="overflow-x:auto"><table class="tbl"><tbody id="lst-holders"></tbody></table></div>
+          <div class="bd" style="padding-top:0">
+            <button class="btn aqua wide" id="lst-settle" hidden><span>Settle</span></button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </main>
+
+<div class="modal" id="pay-modal" hidden role="dialog" aria-modal="true" aria-labelledby="pay-title">
+  <div class="sheet">
+    <h3 id="pay-title">Settle your placement</h3>
+    <p class="sub">The couple is paid the morning after the wedding.</p>
+    <div style="margin-top:18px" id="pay-body"></div>
+    <div class="pstatus" id="pay-status"></div>
+    <button class="btn wide" id="pay-go" style="margin-top:16px"><span>Pay securely</span></button>
+    <button class="btn ghost wide sm" id="pay-close" style="margin-top:9px"><span>Not yet</span></button>
+    <div style="text-align:center">
+      <span class="secure">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        Card details never touch this site
+      </span>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>

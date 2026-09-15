@@ -12,6 +12,7 @@
     --dress:#FBF3FF; --dress-shade:#B08FC9; --skin:#E8C8AC;
     --mint:#2BE8C5; --gold:#FFAE2B; --wine:#FF2E93;   /* engine aliases */
     --ink:#FBF3FF; --hair:#4A2170;
+    color-scheme: dark;                      /* native menus, pickers and scrollbars */
     --glow-m:0 0 32px rgba(255,46,147,.45);
     --glow-a:0 0 32px rgba(43,232,197,.35);
   }
@@ -316,6 +317,14 @@
   .inp{width:100%;padding:13px 15px;border-radius:13px;border:1px solid var(--edge-soft);
     background:rgba(255,255,255,.05);color:var(--text);font-size:.95rem;transition:.2s}
   .inp:focus{outline:none;border-color:var(--aqua);background:rgba(43,232,197,.08)}
+  /* a translucent select renders its popup white-on-white, so give it real colour */
+  select.inp{background-color:#2C1246;appearance:none;padding-right:38px;
+    background-image:linear-gradient(45deg,transparent 50%,var(--soft) 50%),
+                     linear-gradient(135deg,var(--soft) 50%,transparent 50%);
+    background-position:calc(100% - 20px) 52%, calc(100% - 14px) 52%;
+    background-size:6px 6px, 6px 6px; background-repeat:no-repeat}
+  select.inp option{background:#2C1246;color:var(--text)}
+  select.inp:focus{background-color:#38185A}
   .inp::placeholder{color:var(--soft);opacity:.7}
   .swap{margin-top:16px;font-size:.88rem;color:var(--soft);text-align:center}
   .swap button{color:var(--amber);font-weight:700}
@@ -445,6 +454,53 @@
     border-top:1px solid var(--edge-soft);margin-top:11px;padding-top:11px}
   .qtot b{font-family:"Bodoni Moda",serif;font-size:1.7rem;font-weight:600;color:var(--amber);
     font-variant-numeric:tabular-nums}
+
+  /* ---------- listing numbers ---------- */
+  .kpis{display:flex;gap:14px;margin-top:11px;flex-wrap:wrap}
+  .kpis span{display:flex;flex-direction:column;font-family:"IBM Plex Mono",monospace;
+    font-size:.58rem;letter-spacing:.11em;text-transform:uppercase;color:var(--soft)}
+  .kpis b{font-family:"Outfit",sans-serif;font-size:.98rem;letter-spacing:0;
+    text-transform:none;color:var(--text)}
+  .arow{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    padding:9px 0;border-bottom:1px solid var(--edge-soft);font-size:.88rem}
+  .arow:last-child{border-bottom:0}
+  .arow small{display:block;color:var(--soft);font-size:.74rem;margin-top:1px}
+  .arow b{font-family:"IBM Plex Mono",monospace;font-weight:600;white-space:nowrap;text-align:right}
+  .arow.cpm b{color:var(--aqua);font-size:1.05rem}
+  .asplit{height:1px;background:var(--edge);margin:10px 0}
+  .atot{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    border-top:1px solid var(--edge);margin-top:10px;padding-top:12px}
+  .atot span{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--soft)}
+  .atot b{font-family:"Bodoni Moda",serif;font-size:1.65rem;font-weight:600;color:var(--amber)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:520px){.grid2{grid-template-columns:1fr}}
+  .check{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:13px;
+    border:1px solid var(--edge-soft);background:rgba(255,255,255,.04);font-size:.9rem;cursor:pointer}
+  .check input{accent-color:var(--magenta);width:17px;height:17px}
+
+  /* ---------- payment ---------- */
+  .modal{position:fixed;inset:0;z-index:95;display:grid;place-items:center;padding:22px;
+    background:rgba(11,4,20,.72)}
+  .modal .sheet{width:min(460px,100%);border-radius:24px;padding:28px;
+    background:rgba(42,16,67,.96);border:1px solid var(--edge);
+    box-shadow:0 40px 90px -36px rgba(0,0,0,.95)}
+  .modal h3{font-family:"Bodoni Moda",serif;font-size:1.6rem;font-weight:600}
+  .modal .sub{color:var(--soft);font-size:.86rem;margin-top:5px}
+  .prow{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:.9rem}
+  .prow b{font-family:"IBM Plex Mono",monospace;font-weight:600}
+  .ptot{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    border-top:1px solid var(--edge);margin-top:10px;padding-top:12px}
+  .ptot span{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--soft)}
+  .ptot b{font-family:"Bodoni Moda",serif;font-size:1.8rem;font-weight:600;color:var(--amber)}
+  .pnote{margin-top:14px;font-size:.8rem;color:var(--soft);line-height:1.5}
+  .pnote code{font-family:"IBM Plex Mono",monospace;color:var(--aqua)}
+  .pstatus{margin-top:10px;font-size:.82rem;color:var(--aqua);min-height:1.2em;text-align:center}
+  .secure{display:inline-flex;align-items:center;gap:7px;font-family:"IBM Plex Mono",monospace;
+    font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--soft);margin-top:14px}
+  .secure svg{width:13px;height:13px;color:var(--aqua)}
 
   /* ---------- toast ---------- */
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:90;max-width:min(94vw,540px);
@@ -709,6 +765,44 @@
           </div>
         </div>
 
+        <div class="card">
+          <div class="hd"><h3>What brands will see</h3><span class="pill live">Your numbers</span></div>
+          <div class="bd">
+            <div class="fld"><label for="ev-garment">What you're listing</label>
+              <select class="inp" id="ev-garment">
+                <option value="gown">A wedding gown</option>
+                <option value="suit">A suit</option>
+              </select></div>
+            <div class="grid2">
+              <div class="fld"><label for="ev-invited">Invited</label>
+                <input class="inp" id="ev-invited" type="number" min="0"></div>
+              <div class="fld"><label for="ev-confirmed">Confirmed</label>
+                <input class="inp" id="ev-confirmed" type="number" min="0"></div>
+            </div>
+            <div class="fld"><label for="ev-venue">Venue</label>
+              <input class="inp" id="ev-venue" type="text"></div>
+            <div class="grid2">
+              <div class="fld"><label for="ev-venuetype">Venue type</label>
+                <input class="inp" id="ev-venuetype" type="text"></div>
+              <div class="fld"><label for="ev-gallery">Gallery</label>
+                <input class="inp" id="ev-gallery" type="text"></div>
+            </div>
+            <div class="fld"><label for="ev-shooters">Who's shooting it</label>
+              <input class="inp" id="ev-shooters" type="text"></div>
+            <div class="grid2">
+              <div class="fld"><label for="ev-reach">Combined social reach</label>
+                <input class="inp" id="ev-reach" type="number" min="0"></div>
+              <div class="fld"><label for="ev-hashtag">Hashtag</label>
+                <input class="inp" id="ev-hashtag" type="text"></div>
+            </div>
+            <div class="fld"><label for="ev-press">Press</label>
+              <input class="inp" id="ev-press" type="text"></div>
+            <label class="check" for="ev-live">
+              <input type="checkbox" id="ev-live"> Being livestreamed</label>
+            <div style="margin-top:16px" id="ev-audience"></div>
+          </div>
+        </div>
+
         <div class="card" id="cl-settings">
           <div class="hd"><h3>My terms</h3></div>
           <div class="bd">
@@ -795,13 +889,39 @@
         </div>
 
         <div class="card">
+          <div class="hd"><h3>What you're buying</h3><span class="pill you" id="pay-mode">Demo mode</span></div>
+          <div class="bd" id="lst-audience"></div>
+        </div>
+
+        <div class="card">
           <div class="hd"><h3>Who holds what</h3></div>
           <div style="overflow-x:auto"><table class="tbl"><tbody id="lst-holders"></tbody></table></div>
+          <div class="bd" style="padding-top:0">
+            <button class="btn aqua wide" id="lst-settle" hidden><span>Settle</span></button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </main>
+
+<div class="modal" id="pay-modal" hidden role="dialog" aria-modal="true" aria-labelledby="pay-title">
+  <div class="sheet">
+    <h3 id="pay-title">Settle your placement</h3>
+    <p class="sub">The couple is paid the morning after the wedding.</p>
+    <div style="margin-top:18px" id="pay-body"></div>
+    <div class="pstatus" id="pay-status"></div>
+    <button class="btn wide" id="pay-go" style="margin-top:16px"><span>Pay securely</span></button>
+    <button class="btn ghost wide sm" id="pay-close" style="margin-top:9px"><span>Not yet</span></button>
+    <div style="text-align:center">
+      <span class="secure">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        Card details never touch this site
+      </span>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
@@ -836,15 +956,53 @@
     }
     return L.concat(R.reverse());
   }
-  const MASK = new Uint8Array(NCELL);
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
-    const v=(r+0.5)/ROWS, u=(c+0.5)/COLS, hw=halfWidth(v);
-    let on = hw>0 && Math.abs(u-0.5) <= hw;
-    const dx=u-0.5, dy=(v-0.143)/1.33;
-    if(on && Math.hypot(dx,dy) < 0.052) on = false;
-    MASK[r*COLS+c] = on?1:0;
+  /* ---- two garments: a gown and a suit. Each is a silhouette predicate,
+         rasterised once into the cell mask the market trades on. ---- */
+  function inGown(u, v){
+    const hw = halfWidth(v);
+    if(hw <= 0 || Math.abs(u-0.5) > hw) return false;
+    const dx = u-0.5, dy = (v-0.143)/1.33;
+    return Math.hypot(dx, dy) >= 0.052;            // neckline cut-out
   }
-  const TOTAL_CELLS = MASK.reduce((a,b)=>a+b,0);
+  /* A suit as two profiles: the torso, and a pair of trouser legs. */
+  const S_TOP = 0.150, S_SHOULDER = 0.196, S_WAIST = 0.545, S_HEM = 0.985;
+  function suitTorsoHW(v){
+    if(v < S_TOP || v > S_WAIST) return 0;
+    if(v < S_SHOULDER){                                    // collar and neck
+      const t = (v - S_TOP) / (S_SHOULDER - S_TOP);
+      return 0.050 + Math.pow(t, 2.6) * 0.020;
+    }
+    if(v < 0.245){                                         // shoulders drop into the body
+      const t = (v - S_SHOULDER) / 0.049;
+      return 0.070 + Math.sqrt(t) * 0.136;
+    }
+    const t = (v - 0.245) / (S_WAIST - 0.245);             // jacket tapers to the waist
+    return 0.206 - t * 0.048;
+  }
+  function suitLeg(v){
+    const t = Math.max(0, (v - S_WAIST) / (S_HEM - S_WAIST));
+    return {half: 0.076 - t * 0.014, gap: 0.008 + t * 0.012};
+  }
+  function inSuit(u, v){
+    const du = Math.abs(u - 0.5);
+    if(v < S_TOP || v > S_HEM) return false;
+    if(v <= S_WAIST) return du <= suitTorsoHW(v);
+    const L = suitLeg(v);
+    return Math.abs(du - (L.gap + L.half)) <= L.half;
+  }
+  const SHAPES = {gown:inGown, suit:inSuit};
+  const GARMENT_LABEL = {gown:"Gown", suit:"Suit"};
+  const MASKS = {}, TOTALS = {};
+  Object.keys(SHAPES).forEach(g => {
+    const m = new Uint8Array(NCELL);
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
+      m[r*COLS+c] = SHAPES[g]((c+0.5)/COLS, (r+0.5)/ROWS) ? 1 : 0;
+    MASKS[g] = m;
+    TOTALS[g] = m.reduce((a,b)=>a+b,0);
+  });
+  const MASK = MASKS.gown, TOTAL_CELLS = TOTALS.gown;   /* the 3D hero uses the gown */
+  const maskOf  = g => MASKS[g]  || MASKS.gown;
+  const totalOf = g => TOTALS[g] || TOTALS.gown;
 
   /** Paint the illustrated gown straight onto a 2D context. */
   function paintGown(ctx, W, H){
@@ -887,6 +1045,82 @@
     ctx.beginPath(); ctx.ellipse(0.5*W, 0.140*H, 0.037*W, 0.037*W*1.30, 0, 0, 7); ctx.fill();
   }
 
+  /** The suit, drawn with paths so the edges are as clean as the gown's. */
+  function paintSuit(ctx, W, H){
+    const cs = getComputedStyle(document.body);
+    const cloth = cs.getPropertyValue("--dress").trim();
+    const shade = cs.getPropertyValue("--dress-shade").trim();
+    const hair  = cs.getPropertyValue("--hair").trim();
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0, cloth); g.addColorStop(1, shade);
+
+    const px = (u,v) => [u*W, v*H];
+    const poly = pts => {
+      ctx.beginPath();
+      pts.forEach(([x,y],i) => i ? ctx.lineTo(x,y) : ctx.moveTo(x,y));
+      ctx.closePath();
+    };
+
+    /* torso: sample the profile down the left, back up the right */
+    const L = [], R = [];
+    for(let k=0;k<=80;k++){
+      const v = S_TOP + (S_WAIST - S_TOP) * k/80, hw = suitTorsoHW(v);
+      L.push(px(0.5-hw, v)); R.push(px(0.5+hw, v));
+    }
+    ctx.fillStyle = g; poly(L.concat(R.reverse())); ctx.fill();
+
+    /* trousers */
+    [-1, 1].forEach(side => {
+      const A = [], B = [];
+      for(let k=0;k<=40;k++){
+        const v = S_WAIST + (S_HEM - S_WAIST) * k/40, l = suitLeg(v);
+        const c = 0.5 + side * (l.gap + l.half);
+        A.push(px(c - l.half, v)); B.push(px(c + l.half, v));
+      }
+      poly(A.concat(B.reverse())); ctx.fill();
+    });
+
+    /* shirt panel, then the lapels laid over it */
+    ctx.fillStyle = cloth;
+    poly([px(0.5-0.062,0.205), px(0.5+0.062,0.205), px(0.5+0.030,0.44), px(0.5-0.030,0.44)]);
+    ctx.fill();
+    ctx.fillStyle = shade; ctx.globalAlpha = .62;
+    poly([px(0.5-0.075,0.200), px(0.5-0.010,0.205), px(0.5,0.455), px(0.5-0.150,0.255)]);
+    ctx.fill();
+    poly([px(0.5+0.075,0.200), px(0.5+0.010,0.205), px(0.5,0.455), px(0.5+0.150,0.255)]);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    /* tie - the detail that says suit at a glance */
+    ctx.fillStyle = shade;
+    poly([px(0.5-0.016,0.212), px(0.5+0.016,0.212), px(0.5+0.010,0.245), px(0.5-0.010,0.245)]);
+    ctx.fill();
+    poly([px(0.5-0.011,0.248), px(0.5+0.011,0.248), px(0.5+0.024,0.40), px(0.5,0.435), px(0.5-0.024,0.40)]);
+    ctx.fill();
+
+    /* seams, buttons, creases */
+    ctx.strokeStyle = hair; ctx.lineWidth = Math.max(1, W*0.0035);
+    ctx.globalAlpha = .7;
+    ctx.beginPath(); ctx.moveTo(...px(0.5,0.455)); ctx.lineTo(...px(0.5,S_WAIST)); ctx.stroke();
+    ctx.globalAlpha = .45;
+    [-1,1].forEach(side => {
+      ctx.beginPath();
+      for(let k=0;k<=20;k++){
+        const v = S_WAIST + 0.02 + (S_HEM - S_WAIST - 0.03) * k/20, l = suitLeg(v);
+        const c = 0.5 + side * (l.gap + l.half);
+        const q = px(c, v); k ? ctx.lineTo(...q) : ctx.moveTo(...q);
+      }
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = hair;
+    [0.478, 0.518].forEach(v => {
+      ctx.beginPath(); ctx.arc(...px(0.5, v), W*0.007, 0, 7); ctx.fill();
+    });
+  }
+
+  const paintGarment = (g, ctx, W, H) => g === "suit" ? paintSuit(ctx,W,H) : paintGown(ctx,W,H);
+
   /** SVG version for the marketing carousel (crisp at any size, no canvas sizing dance). */
   let gownUid = 0;
   function gownSVG(){
@@ -923,8 +1157,8 @@
   const PALETTE = ["#FF6A9F","#FFAE2B","#7FD4FF","#C6F32B","#FF8A5B","#59E0A8","#FFD166","#8AA0FF"];
   const MINE_COLOR = "#C08BFF";
 
-  function newMarket(floor, minArea, seconds){
-    return {owner:new Int16Array(NCELL).fill(-1), holders:[],
+  function newMarket(floor, minArea, seconds, garment){
+    return {owner:new Int16Array(NCELL).fill(-1), holders:[], g:garment || "gown",
             floor, minArea, closesAt:Date.now()+seconds*1000, open:true, bids:[]};
   }
   function holderOf(mkt, name, tag, mine){
@@ -939,17 +1173,17 @@
     if(mine){ h.mine = true; h.color = MINE_COLOR; }
     return h;
   }
-  function cellsIn(px, W, H){
-    const cw = W/COLS, ch = H/ROWS, out = [];
+  function cellsIn(g, px, W, H){
+    const mask = maskOf(g), cw = W/COLS, ch = H/ROWS, out = [];
     const c0 = clamp(Math.floor(px.x/cw),0,COLS-1), c1 = clamp(Math.floor((px.x+px.w-1)/cw),0,COLS-1);
     const r0 = clamp(Math.floor(px.y/ch),0,ROWS-1), r1 = clamp(Math.floor((px.y+px.h-1)/ch),0,ROWS-1);
-    for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++){ const i=r*COLS+c; if(MASK[i]) out.push(i); }
+    for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++){ const i=r*COLS+c; if(mask[i]) out.push(i); }
     return out;
   }
 
   /** The one rule the whole market runs on, applied square inch by square inch. */
   function evaluate(mkt, px, W, H, density){
-    const cells = cellsIn(px, W, H);
+    const cells = cellsIn(mkt.g, px, W, H);
     const area = cells.length*SQIN;
     const free=[], bite=[], block=[], lostBy={};
     cells.forEach(i => {
@@ -990,37 +1224,80 @@
     ["Mellowfield","Sleep on it"],["Kite Insurance","For the drone shot"]
   ];
 
+  /* Every listing carries the numbers a brand actually needs to decide:
+     confirmed heads, where, how it will be shot, and who sees it afterwards. */
   const COUPLES = [
     {id:"mt", names:"Maya & Tal", city:"Tel Aviv", date:"14 June", guests:180,
-     note:"Garden ceremony, string quartet", floor:12, min:20, secs:300,
+     garment:"gown", note:"Garden ceremony, string quartet",
+     venue:"Beit Hanamal", venueType:"Waterfront hall", invited:220, confirmed:186,
+     shooters:"2 photographers + video", livestream:false, gallery:"Public gallery",
+     reach:41000, hashtag:"#MayaAndTal", press:"Two lifestyle blogs",
+     floor:12, min:20, secs:300,
      seed:[["Halcyon Hotels","Stay a while",.34,.22,.31,.13,19],
            ["Tallow & Wick","Candles, obviously",.30,.47,.20,.13,14],
            ["Orbit","Rides home",.53,.60,.26,.16,16.5]]},
     {id:"jr", names:"June & Rosa", city:"Lisbon", date:"2 August", guests:90,
-     note:"Livestreamed to three continents", floor:15, min:25, secs:220,
+     garment:"gown", note:"Livestreamed to three continents",
+     venue:"Palacio do Grilo", venueType:"18th-century palace", invited:110, confirmed:94,
+     shooters:"1 photographer + livestream crew", livestream:true, gallery:"Public gallery",
+     reach:128000, hashtag:"#JuneAndRosa", press:"Featured in two wedding titles",
+     floor:15, min:25, secs:220,
      seed:[["Nimbus Air","Honeymoon, sorted",.36,.18,.28,.14,24],
            ["Caffeina","Third wave, first dance",.40,.55,.22,.14,18]]},
     {id:"ak", names:"Adaeze & Kit", city:"Edinburgh", date:"20 September", guests:240,
-     note:"Second ceremony in Lagos", floor:18, min:30, secs:400,
+     garment:"suit", note:"Second ceremony in Lagos",
+     venue:"Mansfield Traquair", venueType:"Restored church", invited:280, confirmed:244,
+     shooters:"3 photographers, drone", livestream:false, gallery:"Public gallery",
+     reach:76000, hashtag:"#AdaezeAndKit", press:"Covered in Lagos and Edinburgh",
+     floor:18, min:30, secs:400,
      seed:[["Truss","Built for the aisle",.30,.40,.34,.12,26],
            ["Ferrous","Forged, not printed",.24,.72,.26,.14,21],
            ["Byte & Bloom","Flowers that text back",.52,.70,.26,.16,22]]},
     {id:"ps", names:"Priya & Sam", city:"Goa", date:"11 October", guests:320,
-     note:"Three days, four outfits", floor:20, min:25, secs:520,
+     garment:"gown", note:"Three days, four outfits",
+     venue:"Taj Holiday Village", venueType:"Beach resort", invited:400, confirmed:326,
+     shooters:"4 photographers, 2 video, drone", livestream:true, gallery:"Public gallery",
+     reach:210000, hashtag:"#PriyaAndSam", press:"Three-day event, national coverage",
+     floor:20, min:25, secs:520,
      seed:[["Kite Insurance","For the drone shot",.32,.66,.36,.20,28]]},
     {id:"ne", names:"Noor & Eli", city:"Brooklyn", date:"3 November", guests:110,
-     note:"Rooftop, one very good DJ", floor:14, min:20, secs:190,
+     garment:"suit", note:"Rooftop, one very good DJ",
+     venue:"The Green Building", venueType:"Rooftop loft", invited:130, confirmed:112,
+     shooters:"1 photographer + super 8", livestream:false, gallery:"Private gallery",
+     reach:34000, hashtag:"#NoorAndEli", press:"None",
+     floor:14, min:20, secs:190,
      seed:[["Mellowfield","Sleep on it",.34,.24,.30,.14,17],
            ["Velour","Glow, then cry",.28,.58,.24,.15,20],
            ["Pemberton","Joint accounts made easy",.50,.78,.26,.13,16]]},
     {id:"gc", names:"Greta & Cass", city:"Copenhagen", date:"29 November", guests:75,
-     note:"Winter, candles, no speeches", floor:11, min:15, secs:260, seed:[]}
+     garment:"gown", note:"Winter, candles, no speeches",
+     venue:"Vester Vov Vov", venueType:"Old cinema", invited:90, confirmed:78,
+     shooters:"1 photographer", livestream:false, gallery:"Public gallery",
+     reach:19000, hashtag:"#GretaAndCass", press:"None",
+     floor:11, min:15, secs:260, seed:[]}
   ];
+
+  /* What a brand is really buying: heads in the room, plus everyone who sees
+     the pictures afterwards. Deliberately conservative and shown as a workings. */
+  function audience(c){
+    const inRoom = c.confirmed * 34;                  // exposures per guest across a day
+    const social = c.reach * 0.42;                    // posts that actually surface it
+    const stream = c.livestream ? c.reach * 0.35 : 0;
+    const galleryViews = c.gallery === "Public gallery" ? c.confirmed * 22 : 0;
+    const total = Math.round(inRoom + social + stream + galleryViews);
+    return {inRoom:Math.round(inRoom), social:Math.round(social),
+            stream:Math.round(stream), gallery:Math.round(galleryViews), total};
+  }
+  const cpmOf = c => {
+    const a = audience(c).total, spend = raisedOf(c);
+    return a ? (spend / a) * 1000 : 0;
+  };
+
 
   // build each market and seed it
   const REF = {W:600, H:800};   // reference pixel space for seeding & rival moves
   COUPLES.forEach(c => {
-    c.mkt = newMarket(c.floor, c.min, c.secs);
+    c.mkt = newMarket(c.floor, c.min, c.secs, c.garment);
     c.photos = [];
     c.seed.forEach(([n,t,x,y,w,h,d]) => {
       const px = {x:x*REF.W, y:y*REF.H, w:w*REF.W, h:h*REF.H};
@@ -1257,7 +1534,7 @@
       if(!st.W || !st.mkt) return;
       const mkt = st.mkt;
       ctx.clearRect(0,0,st.W,st.H);
-      if(!st.couple.photo) paintGown(ctx, st.W, st.H);
+      if(!st.couple.photo) paintGarment(st.couple.garment, ctx, st.W, st.H);
 
       const byOwner = new Map();
       for(let i=0;i<NCELL;i++){
@@ -1385,6 +1662,7 @@
     clPlot.load(c);
     renderClientStats();
     renderGallery();
+    renderEventEditor();
   }
 
   function renderClientStats(){
@@ -1394,7 +1672,7 @@
     $("cl-raised-d").textContent = mkt.holders.filter(h=>h.cells>0).length + " brands holding space";
     $("cl-bids").textContent = mkt.bids.length;
     $("cl-bids-d").textContent = "from " + new Set(mkt.bids.map(b=>b.brand)).size + " brands";
-    $("cl-claimed").textContent = Math.round(claimed/TOTAL_CELLS*100) + "%";
+    $("cl-claimed").textContent = Math.round(claimed/totalOf(c.garment)*100) + "%";
     $("cl-clock").textContent = fmtClock(mkt.closesAt - Date.now());
     $("cl-status").textContent = mkt.open ? "Open for bids" : "Bidding closed";
     $("cl-status").className = "pill " + (mkt.open ? "live" : "win");
@@ -1472,6 +1750,146 @@
   $("cl-preview").addEventListener("click", () => { viewing = myCouple().id; go("listing"); });
 
   /* ============================================================
+     THE LISTING'S OWN NUMBERS - what the publisher fills in
+     ============================================================ */
+  const EV_FIELDS = [
+    ["ev-venue","venue","text"], ["ev-venuetype","venueType","text"],
+    ["ev-invited","invited","int"], ["ev-confirmed","confirmed","int"],
+    ["ev-shooters","shooters","text"], ["ev-gallery","gallery","text"],
+    ["ev-reach","reach","int"], ["ev-hashtag","hashtag","text"],
+    ["ev-press","press","text"]
+  ];
+
+  function renderEventEditor(){
+    const c = myCouple();
+    if(!$("ev-venue")) return;
+    EV_FIELDS.forEach(([id, key]) => { const el = $(id); if(el) el.value = c[key]; });
+    if($("ev-live")) $("ev-live").checked = !!c.livestream;
+    if($("ev-garment")) $("ev-garment").value = c.garment;
+    paintEventSummary();
+  }
+
+  function paintEventSummary(){
+    const c = myCouple(), box = $("ev-audience");
+    if(!box) return;
+    const a = audience(c);
+    box.innerHTML =
+      `<div class="arow"><span>In the room</span><b>${a.inRoom.toLocaleString("en-US")}</b></div>` +
+      `<div class="arow"><span>Social + gallery</span><b>${(a.social+a.gallery).toLocaleString("en-US")}</b></div>` +
+      (a.stream ? `<div class="arow"><span>Livestream</span><b>${a.stream.toLocaleString("en-US")}</b></div>` : "") +
+      `<div class="atot"><span>Brands will see</span><b>${a.total.toLocaleString("en-US")}</b></div>`;
+  }
+
+  function bindEventEditor(){
+    if(!$("ev-venue")) return;
+    EV_FIELDS.forEach(([id, key, kind]) => {
+      const el = $(id); if(!el) return;
+      el.addEventListener("input", () => {
+        const c = myCouple();
+        c[key] = kind === "int" ? Math.max(0, parseInt(el.value, 10) || 0) : el.value;
+        if(key === "confirmed") c.guests = c[key];
+        paintEventSummary(); renderClientStats();
+      });
+    });
+    const live = $("ev-live");
+    if(live) live.addEventListener("change", () => {
+      myCouple().livestream = live.checked; paintEventSummary(); renderClientStats();
+    });
+    const g = $("ev-garment");
+    if(g) g.addEventListener("change", () => {
+      const c = myCouple();
+      if(c.garment === g.value) return;
+      /* the mask changes shape, so anything already sold no longer maps onto it */
+      c.garment = g.value;
+      c.mkt = newMarket(c.mkt.floor, c.mkt.minArea, 300, c.garment);
+      clPlot.load(c); renderClientStats(); paintEventSummary();
+      toast("Switched to a " + GARMENT_LABEL[c.garment].toLowerCase() +
+            ". Bidding restarts \u2014 the shape changed.", "bad");
+    });
+  }
+
+  /* ============================================================
+     SECURE PAYMENT
+     Card data never touches this page: the server creates a Stripe
+     Checkout Session and we hand off to Stripe's hosted page.
+     With no keys in .env the whole thing stays in demo mode.
+     ============================================================ */
+  const PAY = {
+    cfg: null,
+    async init(){
+      try{
+        const r = await fetch("api/config", {headers:{Accept:"application/json"}});
+        if(r.ok) this.cfg = await r.json();
+      }catch(e){ /* static hosting - demo mode */ }
+      return this.cfg;
+    },
+    get live(){ return !!(this.cfg && this.cfg.publishableKey); },
+    async checkout(order){
+      const r = await fetch("api/checkout", {
+        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(order)
+      });
+      if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || "Checkout failed");
+      return r.json();
+    }
+  };
+
+  function myHolding(c){
+    return c.mkt.holders.find(h => h.mine && h.cells > 0) || null;
+  }
+
+  function openPayment(){
+    const c = COUPLES.find(x => x.id === viewing), h = myHolding(c);
+    const modal = $("pay-modal");
+    if(!modal || !h) return;
+    const feePct = (PAY.cfg && PAY.cfg.feePercent != null) ? PAY.cfg.feePercent : 8;
+    const area = h.cells * SQIN, sub = h.committed, fee = sub * feePct/100, total = sub + fee;
+    modal.dataset.total = String(total);
+    $("pay-body").innerHTML =
+      `<div class="prow"><span>${h.name} on ${c.names}'s ${GARMENT_LABEL[c.garment].toLowerCase()}</span><b></b></div>
+       <div class="prow"><span>Area held</span><b>${Math.round(area)} in\u00b2</b></div>
+       <div class="prow"><span>Rate</span><b>${money2(h.density)}/in\u00b2</b></div>
+       <div class="prow"><span>Placement</span><b>${money(sub)}</b></div>
+       <div class="prow"><span>Platform fee (${feePct}%)</span><b>${money(fee)}</b></div>
+       <div class="ptot"><span>Total due</span><b>${money(total)}</b></div>
+       <p class="pnote">${PAY.live
+         ? "You'll be handed to Stripe's hosted checkout. Card details never touch this site."
+         : "Demo mode \u2014 no payment keys are configured. Add them to <code>.env</code> and run the server to take real payments."}</p>`;
+    $("pay-status").textContent = "";
+    $("pay-go").disabled = false;
+    $("pay-go").textContent = PAY.live ? "Pay " + money(total) + " securely" : "Simulate payment";
+    modal.hidden = false;
+  }
+
+  async function runPayment(){
+    const c = COUPLES.find(x => x.id === viewing), h = myHolding(c);
+    const btn = $("pay-go"), status = $("pay-status");
+    if(!h) return;
+    btn.disabled = true;
+    if(!PAY.live){
+      status.textContent = "Simulating\u2026";
+      setTimeout(() => {
+        h.paid = true;
+        $("pay-modal").hidden = true;
+        renderListingStats();
+        toast("Demo payment recorded. Add Stripe keys to .env to take real money.", "good");
+      }, 700);
+      return;
+    }
+    status.textContent = "Opening secure checkout\u2026";
+    try{
+      /* the server recomputes the amount from the listing - never trust this client */
+      const {url} = await PAY.checkout({
+        listingId: c.id, brand: h.name,
+        cells: h.cells, rate: h.density
+      });
+      window.location.href = url;
+    }catch(err){
+      status.textContent = err.message || "Could not start checkout.";
+      btn.disabled = false;
+    }
+  }
+
+  /* ============================================================
      BROWSE
      ============================================================ */
   let filter = "all", search = "";
@@ -1481,18 +1899,23 @@
     const list = COUPLES.filter(c => {
       if(q && !(c.names+" "+c.city+" "+c.note+" "+c.mkt.holders.map(h=>h.name).join(" ")).toLowerCase().includes(q)) return false;
       if(filter === "closing") return c.mkt.open && c.mkt.closesAt - Date.now() < 240000;
-      if(filter === "room")    return claimedOf(c)/TOTAL_CELLS < 0.5;
+      if(filter === "room")    return claimedOf(c)/totalOf(c.garment) < 0.5;
       if(filter === "big")     return c.guests >= 200;
       return true;
     });
     $("br-grid").innerHTML = list.length ? list.map(c => {
-      const pct = Math.round(claimedOf(c)/TOTAL_CELLS*100);
+      const pct = Math.round(claimedOf(c)/totalOf(c.garment)*100);
       return `<button class="lot" data-c="${c.id}">
         <div class="top"><canvas data-thumb="${c.id}"></canvas>
           <span class="timer">${c.mkt.open ? fmtClock(c.mkt.closesAt-Date.now()) : "closed"}</span></div>
         <div class="bd">
           <div class="nm">${c.names}</div>
-          <div class="mt">${c.date} \u00b7 ${c.city} \u00b7 ${c.guests} guests</div>
+          <div class="mt">${c.date} \u00b7 ${c.city} \u00b7 ${GARMENT_LABEL[c.garment]}</div>
+          <div class="kpis">
+            <span><b>${c.confirmed}</b>confirmed</span>
+            <span><b>${(audience(c).total/1000).toFixed(0)}k</b>reach</span>
+            <span><b>${c.livestream ? "Yes" : "No"}</b>livestream</span>
+          </div>
           <div class="bar"><i style="width:${pct}%"></i></div>
           <div class="ft"><span>${pct}% claimed \u00b7 floor ${money2(c.mkt.floor)}/in\u00b2</span><b>${money(raisedOf(c))}</b></div>
         </div></button>`;
@@ -1517,7 +1940,7 @@
     x.save(); x.translate(0, -VH*0.045);
     if(c.photo){
       const im = new Image(); im.onload = () => { x.drawImage(im,0,0,VW,VH); }; im.src = c.photo;
-    } else paintGown(x, VW, VH);
+    } else paintGarment(c.garment, x, VW, VH);
     const cw = VW/COLS, ch = VH/ROWS, groups = new Map();
     for(let i=0;i<NCELL;i++){
       const o = c.mkt.owner[i]; if(o<0) continue;
@@ -1562,15 +1985,47 @@
     lstPlot.load(c);
     syncQuote(null);
     renderListingStats();
+    renderAudience(c);
+  }
+
+  /* What a brand is buying, stated as a workings rather than one vague number. */
+  function renderAudience(c){
+    const box = $("lst-audience");
+    if(!box) return;
+    const a = audience(c), cpm = cpmOf(c);
+    const row = (k, v, note) =>
+      `<div class="arow"><span>${k}${note ? `<small>${note}</small>` : ""}</span><b>${v}</b></div>`;
+    box.innerHTML =
+      row("Confirmed guests", c.confirmed.toLocaleString("en-US"),
+          c.invited + " invited \u00b7 " + Math.round(c.confirmed/c.invited*100) + "% accepted") +
+      row("Venue", c.venue, c.venueType + " \u00b7 " + c.city) +
+      row("Shot by", c.shooters, c.gallery) +
+      row("Livestream", c.livestream ? "Yes" : "No", c.livestream ? "Carried to remote guests" : "In-person only") +
+      row("Social reach", (c.reach/1000).toFixed(0) + "k", c.hashtag) +
+      row("Press", c.press, "") +
+      `<div class="asplit"></div>` +
+      row("In the room", a.inRoom.toLocaleString("en-US"), "exposures across the day") +
+      row("Social + gallery", (a.social + a.gallery).toLocaleString("en-US"), "after the day") +
+      (a.stream ? row("Livestream", a.stream.toLocaleString("en-US"), "concurrent and replay") : "") +
+      `<div class="atot"><span>Estimated impressions</span><b>${a.total.toLocaleString("en-US")}</b></div>` +
+      `<div class="arow cpm"><span>Cost per thousand<small>at the current clearing rate</small></span>
+         <b>${cpm ? money2(cpm) : "\u2014"}</b></div>`;
   }
 
   function renderListingStats(){
     const c = COUPLES.find(x => x.id === viewing);
     $("lst-clock").textContent = fmtClock(c.mkt.closesAt - Date.now());
     $("lst-rate").textContent  = money2(rateOf(c));
-    $("lst-left").textContent  = Math.round((1-claimedOf(c)/TOTAL_CELLS)*100) + "%";
+    $("lst-left").textContent  = Math.round((1-claimedOf(c)/totalOf(c.garment))*100) + "%";
     $("lst-status").textContent = c.mkt.open ? "Open" : "Closed";
     $("lst-status").className = "pill " + (c.mkt.open ? "live" : "win");
+    const mine = c.mkt.holders.find(h => h.mine && h.cells > 0);
+    const settle = $("lst-settle");
+    if(settle){
+      settle.hidden = !mine;
+      if(mine) settle.querySelector("span").textContent =
+        (mine.paid ? "Paid \u00b7 " : "Settle ") + money(mine.committed);
+    }
     $("lst-holders").innerHTML = c.mkt.holders.filter(h => h.cells>0)
       .sort((a,b) => b.committed-a.committed).map(h => `
         <tr><td><span class="bwho"><i class="bdot" style="background:${h.color}"></i>
@@ -2086,6 +2541,14 @@
      BOOT
      ============================================================ */
   window.addEventListener("scroll", () => $("nav").classList.toggle("stuck", window.scrollY > 8));
+  bindEventEditor();
+  PAY.init().then(() => {
+    const tag = $("pay-mode");
+    if(tag) tag.textContent = PAY.live ? "Live payments" : "Demo mode";
+  });
+  if($("pay-go")) $("pay-go").addEventListener("click", runPayment);
+  if($("pay-close")) $("pay-close").addEventListener("click", () => $("pay-modal").hidden = true);
+  if($("lst-settle")) $("lst-settle").addEventListener("click", openPayment);
   buildCarousel(); restartCar(); renderSteps("couple"); renderNavRight(); syncAuth(); spec(); heroArt();
 })();
 </script>

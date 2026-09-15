@@ -109,6 +109,48 @@ hatch** area you are priced out of.
 The engine is `evaluate()` and `commit()` - about 40 lines, no dependencies. Your own
 brand always renders in a reserved blue so it never collides with a rival's colour.
 
+
+## Listings carry real numbers
+
+A brand can't decide on vibes, so every listing states what it's buying:
+
+| Publisher fills in | Brands see |
+|---|---|
+| Invited / confirmed, venue + type, who's shooting it, gallery, social reach, hashtag, press, livestream yes/no | The same, plus estimated impressions broken into *in the room*, *social + gallery*, *livestream*, and a **cost per thousand** at the current clearing rate |
+
+The estimate is deliberately conservative and shown as a workings rather than one
+unaccountable number: guests x exposures across the day, social reach x the share that
+actually surfaces, gallery views, and a livestream term only when there is one.
+
+## Gowns and suits
+
+A publisher lists either. Each garment is a silhouette predicate rasterised into the
+trading grid, so the market, the drawing and the area maths always agree. Switching
+garment restarts bidding, because the shape - and therefore what anyone bought - changes.
+
+## Payments
+
+Card details never touch the page. The server creates a **Stripe Checkout Session** and
+the browser is handed to Stripe's hosted page; the secret key stays on the server.
+
+```
+cp .env.example .env     # already done - the keys are blank, fill them in
+cd server && npm install && npm start
+```
+
+Then open `http://localhost:8787`. With blank keys everything still runs and the
+checkout drops to **demo mode**; add `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY`
+and it takes real money.
+
+- `GET /api/config` - publishable key and platform fee, never the secret
+- `POST /api/checkout` - **recomputes the amount server-side** from its own copy of the
+  listing and validates against that listing's floor rate and minimum allocation. The
+  client is never trusted for price.
+- `POST /api/webhook` - signature-verified, where you'd mark a placement paid
+
+`.env` is gitignored. `helmet` sets a CSP that admits Stripe and nothing else; `/api` is
+rate limited.
+
 ## Files
 
 | File | What it is |
