@@ -299,7 +299,7 @@ a:hover{color:var(--ink)}
 .meter{height:6px;border-radius:var(--r-pill);background:var(--wash-2);overflow:hidden;margin-top:14px}
 .meter i{
   display:block;height:100%;width:0;border-radius:inherit;
-  background:linear-gradient(90deg,var(--accent),#E0813F);
+  background:var(--accent);
   transition:width .9s cubic-bezier(.2,.8,.3,1);
 }
 .goal .under{display:flex;gap:6px 18px;flex-wrap:wrap;margin-top:14px;font-size:.82rem;color:var(--ink-3)}
@@ -330,12 +330,18 @@ a:hover{color:var(--ink)}
 .garment-wrap.both{grid-template-columns:1fr 1fr;max-width:940px;margin-inline:auto}
 .garment-wrap.solo{max-width:430px;margin-inline:auto}
 
+/* A panel with a photograph in it takes the PHOTOGRAPH's shape, not a fixed
+   3:4. Spot coordinates are percentages of this element, so any cropping - and
+   object-fit:cover crops whenever the two ratios disagree - would slide every
+   box off the fabric it was drawn on. Only the silhouette placeholder, which
+   has no content to lose, keeps a fixed ratio. */
 .garment{
-  position:relative;aspect-ratio:3/4;overflow:hidden;
+  position:relative;overflow:hidden;
   border-radius:var(--r-lg);border:1px solid var(--line);
   background:var(--wash);box-shadow:var(--shadow);
 }
-.garment>img{width:100%;height:100%;object-fit:cover}
+.garment:not(.photo){aspect-ratio:3/4}
+.garment>img{display:block;width:100%;height:auto}
 .garment>svg{width:100%;height:100%;padding:7%}
 /* A quiet note, not a banner. It used to be a full-width gradient block and it
    sat on top of whatever spots the publisher had drawn near the hem. */
@@ -347,7 +353,6 @@ a:hover{color:var(--ink)}
 }
 .garment .empty .lbl{font-size:.6rem;letter-spacing:.13em}
 .garment .empty p:not(.lbl){display:none}
-.garment.editing{cursor:crosshair}
 .side-tag{
   position:absolute;top:12px;inset-inline-start:12px;z-index:3;
   padding:5px 11px;border-radius:var(--r-pill);
@@ -397,10 +402,60 @@ a:hover{color:var(--ink)}
   filter:drop-shadow(0 1px 2px rgba(255,255,255,.9));
 }
 .spot.has-logo{background:rgba(252,251,249,.55)}
+/* The rectangle under the hand while a brand is dragging one out, with what
+   it costs following the corner. */
 .spot-draft{
   position:absolute;border:2px dashed var(--accent);border-radius:7px;
-  background:rgba(194,80,43,.12);pointer-events:none;
+  background:rgba(194,80,43,.14);pointer-events:none;
+  display:flex;align-items:center;justify-content:center;
 }
+.spot-draft span{
+  padding:3px 9px;border-radius:var(--r-pill);
+  background:var(--ink);color:var(--paper);
+  font-family:var(--mono);font-size:.68rem;font-weight:500;white-space:nowrap;
+  box-shadow:0 4px 14px -6px rgba(20,18,14,.7);
+}
+/* A box the rules will not allow, while it is still being dragged and after
+   it has been refused. The rectangle stays on the cloth with the reason on
+   it: a refusal that deletes what you drew and explains itself in a corner
+   of the screen leaves you with nothing to correct. */
+.spot-draft.bad{border-color:var(--bad);background:rgba(163,32,24,.16)}
+.spot-draft.bad span{
+  background:var(--bad);
+  white-space:normal;text-align:center;max-width:22ch;line-height:1.35;
+}
+/* An armed panel is one the next drag will draw on.
+
+   `touch-action:none` is load-bearing and also dangerous, which is why it is
+   only on while drawing is armed. Without it a finger dragged across the
+   photograph is claimed by the browser as a scroll before pointermove is ever
+   called, and the feature is dead on a phone while working perfectly on every
+   desktop it was tested on. Left on permanently it is worse: the photograph
+   is most of a phone screen, and a page you cannot scroll by swiping the
+   biggest thing on it feels broken in a way nobody reports, they just leave. */
+.garment.drawable{cursor:crosshair;touch-action:none}
+/* While armed, the spots are scenery: the press underneath them has to reach
+   the panel so a rectangle can start anywhere on the fabric. */
+.garment.drawable .spot{pointer-events:none}
+.garment.drawable::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 0 0 2px var(--accent);border-radius:inherit;
+}
+
+/* ------------------------------------------------ brands waiting on a yes */
+.pend{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:14px 0;border-bottom:1px solid var(--line);
+}
+.pend:last-child{border-bottom:0}
+.pend h4{margin:0}
+.pend .chips{margin-inline-start:auto}
+.pend-thumb{
+  position:relative;flex:none;width:52px;aspect-ratio:3/4;overflow:hidden;
+  border-radius:var(--r-sm);border:1px solid var(--line);background:var(--wash);
+}
+.pend-thumb img{width:100%;height:100%;object-fit:cover}
+.pend-thumb i{position:absolute;border:1.5px solid var(--accent);background:rgba(194,80,43,.3);border-radius:2px}
 
 /* =========================================================================
    the spot list
@@ -450,7 +505,7 @@ a:hover{color:var(--ink)}
 .feature{
   padding:34px 26px;border-radius:var(--r-xl);
   border:1px solid var(--line-2);
-  background:linear-gradient(180deg,var(--gold-wash),var(--card) 62%);
+  background:var(--gold-wash);
 }
 @media (min-width:768px){ .feature{padding:48px 44px} }
 .feature ul{list-style:none;margin:26px 0 0;padding:0;display:grid;gap:11px}
@@ -648,6 +703,10 @@ a:hover{color:var(--ink)}
   display:block;margin-bottom:7px;
   font-family:var(--mono);font-size:.66rem;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);
 }
+/* Which clock a datetime-local field is keeping, said next to the label -
+   the input itself never shows it, and the publisher is setting the moment
+   their campaign ends. */
+.fld label .tz{text-transform:none;letter-spacing:.04em;color:var(--ink-2)}
 .inp{
   width:100%;min-height:46px;padding:12px 14px;
   border-radius:var(--r);border:1px solid var(--line-2);
@@ -655,6 +714,9 @@ a:hover{color:var(--ink)}
   transition:border-color .16s,box-shadow .16s;
 }
 .inp:focus{outline:0;border-color:var(--ink);box-shadow:0 0 0 3px rgba(20,18,14,.08)}
+/* The field a refusal is about, marked on the field itself. A message alone,
+   somewhere below the fold of a long form, is a refusal nobody acts on. */
+.inp[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 3px rgba(163,32,24,.12)}
 .inp::placeholder{color:var(--ink-3)}
 textarea.inp{min-height:96px;resize:vertical;line-height:1.55}
 select.inp{
@@ -668,6 +730,9 @@ select.inp{
   color:var(--bad);font-size:.86rem;margin:0 0 14px;padding:10px 13px;
   border-radius:var(--r);background:rgba(163,32,24,.07);border:1px solid rgba(163,32,24,.22);
 }
+/* The per-field version of the above: it sits under the one field it is
+   about, so the reader never has to work out which of nine inputs is wrong. */
+.fld-err{color:var(--bad);font-size:.82rem;margin-top:6px}
 
 .seg{display:inline-flex;gap:3px;padding:3px;border-radius:var(--r-pill);background:var(--wash);border:1px solid var(--line)}
 .seg button{
@@ -685,10 +750,14 @@ select.inp{
   transition:border-color .16s,background .16s;
 }
 .drop:hover{border-color:var(--ink);background:var(--wash-2)}
+/* The file input fills the whole box and is invisible, so marking it invalid
+   has to colour the box around it or nothing on screen changes at all. */
+.drop:has(input[aria-invalid="true"]){border-color:var(--bad);background:rgba(163,32,24,.05)}
 .drop input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
 .drop .big{font-size:.95rem;font-weight:500}
 .drop .small{font-size:.78rem;color:var(--ink-3);margin-top:4px}
 .drop.has{border-style:solid;border-color:var(--live);background:var(--live-wash)}
+.drop.over{border-color:var(--accent);background:var(--accent-wash)}
 
 /* the quote block inside the bid sheet ------------------------------------- */
 .quote{border:1px solid var(--line);border-radius:var(--r);background:var(--wash);padding:4px 16px}

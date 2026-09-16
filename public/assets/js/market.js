@@ -23,6 +23,23 @@
     ANTI_SNIPE_MIN: 10,
     MAX_BID: 1000000,
     MIN_BID: 1,
+
+    /* ---------------------------------------------------- priced by area
+       The brand draws the rectangle it wants and the price follows from how
+       much of the photograph it covers. These are the fall-backs for a
+       listing that has not said otherwise - the publisher sets both on the
+       row, and `rateOf`/`frontMultiplierOf` land here when the row is silent,
+       out of range, or not a number at all. */
+    RATE_PER_PERCENT: 250,
+    /* The front of a garment is what the camera is pointed at all evening,
+       so the same rectangle costs more there than on the back. */
+    FRONT_MULTIPLIER: 1.6,
+    /* A box smaller than this carries a price nobody can read on a phone and
+       a logo nobody can recognise; a box larger than this is one brand
+       buying the whole garment and ending the market. Both are enforced in
+       here rather than in the page, so the server agrees by construction. */
+    MIN_AREA_PCT: 0.8,
+    MAX_AREA_PCT: 12,
   };
 
   const money = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -31,6 +48,135 @@
 
   /* The smallest bid that beats `price`. */
   const raiseOver = price => up(price * (1 + RULES.MIN_RAISE));
+
+  /* ============================================================ the cloth
+     The publisher no longer draws the spots. A brand drags out the rectangle
+     it wants, anywhere on the front or the back, and the floor under it
+     follows from the AREA it covers. Everything in this section is loaded by
+     both sides for the same reason `evaluate` is: the page has to quote a
+     price while the finger is still moving, and the server has to arrive at
+     that identical number from its own copy of the listing. Two
+     implementations would be two prices.
+
+     A box is { side, x, y, w, h }, every one of them a PERCENTAGE of the
+     photograph - never a pixel. A layout dragged out on a laptop lands in the
+     same place on a phone, and replacing the photograph does not move
+     anything that was sold on the old one. */
+
+  /* How much of the image the box covers, as a percentage of its area.
+     `w` and `h` are each already a percentage, so their product is in
+     hundredths of a percent and has to come back down by 100:
+     a 27% x 10% box covers 2.7% of the photograph, not 270%. */
+  function areaPercent(box) {
+    return Number(box && box.w) * Number(box && box.h) / 100;
+  }
+
+  /* `rate_per_percent` and `front_multiplier` live on the listing, which its
+     owner edits directly under RLS - so they are read defensively. A blank,
+     negative or non-numeric rate falls back to the default rather than
+     pricing somebody's dress at NaN, which `Math.ceil` would hand straight to
+     a NOT NULL numeric column. The bounds match the CHECK constraints on
+     those two columns, so what the database refuses this refuses too. */
+  /* "Absent" and "zero" are different answers, and `Number` conflates them:
+     Number(null) is 0, not NaN. Reading the rate with a bare Number() priced
+     every box on a listing whose column is still null - which is every
+     listing until the migration runs - at nothing at all, and did it
+     silently. A missing column falls back to the default; only a rate that is
+     really there and really zero means free. */
+  const stated = v => (v === null || v === undefined || v === "" ? NaN : Number(v));
+
+  function rateOf(listing) {
+    const r = stated(listing && listing.rate_per_percent);
+    return Number.isFinite(r) && r >= 0 ? r : RULES.RATE_PER_PERCENT;
+  }
+  function frontMultiplierOf(listing) {
+    const m = stated(listing && listing.front_multiplier);
+    return Number.isFinite(m) && m > 0 ? m : RULES.FRONT_MULTIPLIER;
+  }
+
+  /* The floor under a drawn box: area x rate, and more for the front.
+     27% x 10% on the front of a default listing is 2.7 x 250 x 1.6 = 1080.
+
+     Rounded with `up`, not with a bare Math.ceil, and that epsilon is load
+     bearing: 2.7 * 250 * 1.6 happens to land exactly, but of the fifty
+     thousand whole-number boxes on a 100x100 grid, sixteen hundred of them
+     come out a dust mote above their own integer - 55.00000000000001 for a
+     1% x 50% box at 100/1.1 - and a bare ceil charges the brand a whole extra
+     unit for a float. `up` is the same rounding `raiseOver` already uses. */
+  function priceForBox(box, listing) {
+    const sideFactor = (box && box.side) === "front" ? frontMultiplierOf(listing) : 1;
+    /* Math.max keeps a price out of the negatives and, less obviously, turns
+       the -0 that `up(0)` produces back into 0 - a publisher who gives space
+       away should not have "-0" written onto the spot. */
+    return Math.max(0, up(areaPercent(box) * rateOf(listing) * sideFactor));
+  }
+
+  /* Two boxes intersect if they overlap on BOTH axes. The comparison is
+     strict, with a hair of tolerance, so boxes that merely share an edge -
+     x=10,w=20 against x=30 - are neighbours rather than a collision. A
+     non-strict test makes it impossible to tile a garment at all, and without
+     the tolerance two edges that are mathematically flush but a float apart
+     read as an overlap of 0.0000000001% of a photograph. */
+  const TOUCHING = 1e-9;
+  function boxesOverlap(a, b) {
+    return a.x + a.w > b.x + TOUCHING && b.x + b.w > a.x + TOUCHING
+        && a.y + a.h > b.y + TOUCHING && b.y + b.h > a.y + TOUCHING;
+  }
+
+  const rect = b => b && [b.x, b.y, b.w, b.h].every(v => Number.isFinite(Number(v)))
+    ? { x: Number(b.x), y: Number(b.y), w: Number(b.w), h: Number(b.h) }
+    : null;
+
+  const no = reason => ({ ok: false, reason });
+
+  /* ---------------------------------------------------------- validateBox
+     Everything that decides whether a drawn rectangle may exist, in one
+     place: shape, side, bounds, size, and whether somebody is already
+     printing there. Answers { ok, reason }, where `reason` is written to be
+     shown to the person who drew it.
+
+     `existing` is every spot already on THAT side of THAT listing. Pass the
+     unapproved ones too: a rectangle a brand drew ten seconds ago is not
+     approved yet, but it is claimed, and letting a second brand draw over it
+     means two logos printed on one piece of cloth and one of them refunded
+     after the wedding. First to draw holds the ground. */
+  function validateBox(box, listing, existing) {
+    const r = rect(box);
+    if (!r) return no("Draw a box on the photograph.");
+
+    /* The side is part of the price, not just a label: `priceForBox` charges
+       the front multiplier only when it reads "front". A box that arrives
+       with the side missing or misspelt would be priced as a back one and
+       then drawn on the front, which is the front of a garment sold at the
+       back's rate. */
+    if (box.side !== "front" && box.side !== "back")
+      return no("Draw on the front or on the back of the garment.");
+
+    if (r.w <= 0 || r.h <= 0) return no("Drag out a box first.");
+    if (r.x < 0 || r.y < 0 || r.x + r.w > 100 || r.y + r.h > 100)
+      return no("Keep the whole box inside the photograph.");
+
+    const area = areaPercent(r);
+    if (area < RULES.MIN_AREA_PCT - TOUCHING)
+      return no(`That is too small. A spot has to cover at least ${RULES.MIN_AREA_PCT}% of the photograph.`);
+    if (area > RULES.MAX_AREA_PCT + TOUCHING)
+      return no(`That is too big. A spot can cover at most ${RULES.MAX_AREA_PCT}% of the photograph.`);
+
+    for (const other of existing || []) {
+      const o = rect(other);
+      /* A stored spot we cannot measure cannot be intersected either. Skip it
+         rather than letting a NaN comparison quietly answer "no overlap". */
+      if (!o) continue;
+      if (other && other.id != null && box && box.id != null && other.id === box.id) continue;
+      if (boxesOverlap(r, o)) {
+        return no(other && other.n != null
+          ? `That overlaps spot ${other.n}. Two brands cannot print on the same cloth.`
+          : "That overlaps a spot somebody has already taken.");
+      }
+    }
+
+    return { ok: true, reason: null };
+  }
 
   /* ---------------------------------------------------------------- settle
      Proxy bidding, the way an auction house runs it. Everyone states a
@@ -236,5 +382,10 @@
     return `${s}s`;
   }
 
-  return { RULES, settle, nextMinimum, evaluate, commit, quote, campaign, countdown, closingTime, extendIfLate, money, raiseOver };
+  return {
+    RULES, settle, nextMinimum, evaluate, commit, quote, campaign, countdown,
+    closingTime, extendIfLate, money, raiseOver,
+    /* priced by the area a brand draws */
+    areaPercent, priceForBox, validateBox, rateOf, frontMultiplierOf, boxesOverlap,
+  };
 });

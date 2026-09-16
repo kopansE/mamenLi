@@ -1,0 +1,112 @@
+{
+  "p1": {
+    "sex": "female",
+    "garment": "gown",
+    "front": {
+      "file": "p1-front.jpg",
+      "width": 1405,
+      "height": 1536,
+      "box": { "x0": 35, "y0": 22, "x1": 67, "y1": 88 },
+      "waistY": 41,
+      "chestY": 34,
+      "notes": "A-line taper: only x 43-57 is fabric at the top of the box and the deep V neckline bottoms at y 31, the lace sleeves are sheer over bare arms, the clasped hands cross the centre at y 47-55, and the train pools on the terrace outside the box below y 88."
+    },
+    "back": {
+      "file": "p1-back.jpg",
+      "width": 1415,
+      "height": 1536,
+      "box": { "x0": 30, "y0": 21, "x1": 70, "y1": 82 },
+      "waistY": 41,
+      "chestY": 38,
+      "notes": "The upper back is nude illusion tulle with a button placket so anything above y 37 prints over visible skin - chestY is moved down to the first opaque lace, which spans only x 44-57; the train pools on stone below y 83."
+    }
+  },
+  "p2": {
+    "sex": "female",
+    "garment": "gown",
+    "front": {
+      "file": "p2-front.jpg",
+      "width": 1396,
+      "height": 1536,
+      "box": { "x0": 27, "y0": 20, "x1": 72, "y1": 86 },
+      "waistY": 37,
+      "chestY": 29,
+      "notes": "Narrow A-line: at chest height only x 40-63 is fabric and the yoke above y 26 is sheer illusion lace over skin, so full-box-width spots need y below 70; the lace train pools on the floor below y 87."
+    },
+    "back": {
+      "file": "p2-back.jpg",
+      "width": 1396,
+      "height": 1536,
+      "box": { "x0": 26, "y0": 18, "x1": 73, "y1": 84 },
+      "waistY": 36,
+      "chestY": 27,
+      "notes": "The whole back above the y 36 waist seam is sheer illusion lace over bare skin with a covered-button placket on the centre line, so there is no usable chest panel on this view - put spots on the skirt below y 38; train pools below y 85."
+    }
+  },
+  "p3": {
+    "sex": "female",
+    "garment": "gown",
+    "front": {
+      "file": "p3-front.jpg",
+      "width": 1396,
+      "height": 1536,
+      "box": { "x0": 25, "y0": 20, "x1": 76, "y1": 92 },
+      "waistY": 36,
+      "chestY": 28,
+      "notes": "Best surface in the set - plain matte satin bodice x 44-58 from y 24 to 36 with the bare arms well clear at x 41-43 and x 60-64; ivory on ivory, so a logo needs its own dark fill to read."
+    },
+    "back": {
+      "file": "p3-back.jpg",
+      "width": 1396,
+      "height": 1536,
+      "box": { "x0": 22, "y0": 18, "x1": 78, "y1": 86 },
+      "waistY": 36,
+      "chestY": 32,
+      "notes": "Deep scooped back leaves bare skin on the centre line down to y 29 and only narrow straps above that, so chestY is moved below the scoop into the y 29-36 satin band, which is crossed by a vertical line of crystal buttons; a short train lies on the floor below y 86."
+    }
+  },
+  "p4": {
+    "sex": "male",
+    "garment": "suit",
+    "front": {
+      "file": "p4-front.jpg",
+      "width": 1266,
+      "height": 1536,
+      "box": { "x0": 38, "y0": 19, "x1": 72, "y1": 91 },
+      "waistY": 56,
+      "chestY": 31,
+      "notes": "Jacket hangs open so the centre line is tie down to y 30 then waistcoat to y 49, hands sit at x 39-44 and x 66-71 between y 53 and 61, and the legs separate below y 59; very dark navy, a dark logo will disappear."
+    },
+    "back": {
+      "file": "p4-back.jpg",
+      "width": 1381,
+      "height": 1536,
+      "box": { "x0": 33, "y0": 19, "x1": 65, "y1": 92 },
+      "waistY": 55,
+      "chestY": 31,
+      "notes": "Unbroken navy jacket back from y 20 to 55 is the largest clean panel in the set but the fabric is near-black, so a logo needs a light fill; hands at x 34-37 and x 60-65 around y 53-60 and the legs split below y 60."
+    }
+  },
+  "p5": {
+    "sex": "male",
+    "garment": "suit",
+    "front": {
+      "file": "p5-front.jpg",
+      "width": 1357,
+      "height": 1536,
+      "box": { "x0": 35, "y0": 19, "x1": 68, "y1": 92 },
+      "waistY": 56,
+      "chestY": 31,
+      "notes": "Jacket hangs open so the centre line is a turquoise tie down to y 31 then waistcoat to y 50, and a hard light from the left leaves the right jacket panel roughly twice as dark as the left; hands at x 36-40 and x 62-68 around y 53-61, legs split below y 59."
+    },
+    "back": {
+      "file": "p5-back.jpg",
+      "width": 1376,
+      "height": 1536,
+      "box": { "x0": 33, "y0": 19, "x1": 65, "y1": 92 },
+      "waistY": 55,
+      "chestY": 31,
+      "notes": "Unbroken mid-grey jacket back from y 20 to 55, the only fabric here that takes either a light or a dark logo; hands at x 34-36 and x 60-64 around y 53-60 and the legs split below y 60."
+    }
+  }
+}

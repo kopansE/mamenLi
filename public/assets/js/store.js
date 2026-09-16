@@ -97,115 +97,145 @@ window.Store = (function () {
     const d = db();
     if (d.seeded) return;
 
-    const LAYOUT = [
-      /* front */
-      ["front", 1, "Mega Spot",     "MEGA",    1200, 23,   23,   27,   10,   "Top-front placement. In nearly every photograph, every video, every recap montage. This is the one people screenshot."],
-      ["front", 2, "Semi-Mega",     null,       900, 24,   34,   31,    7.5, "Smaller than the Mega, but it sits on the front and comes out in almost every frame."],
-      ["front", 3, "Low Key",       null,       700, 20,   42.5, 20,   10.5, "Below the waist and it reads well in motion - walking, standing or posing."],
-      ["front", 4, "Low Key",       null,       700, 43,   42.5, 19,   10.5, "The mirror of spot 3. Pairs well if you want both and a symmetrical mark."],
-      ["front", 5, "Zero Chill",    null,       500, 28.5, 54,   33,    8,   "Sits under the two verticals. Bigger area, clean lines, good for a wordmark."],
-      ["front", 6, "Prime",         "BIG",      900, 29.5, 64,   31.5, 24,   "Every eye travels to the hem first. The largest single area on the front."],
-      /* back */
-      ["back",  1, "Prime",         null,      1000, 50.3, 27,   22,   11,   "First spot on the back, and the most valuable one there - it holds its place in every photograph taken from behind."],
-      ["back",  2, "Hotspot",       "BIGGEST", 1200, 36.4, 41,   42,   12,   "Needs no explanation. It also covers more fabric than anything else on the garment."],
-      ["back",  3, "Mini",          null,       350, 34.8, 54.5, 16.8, 10,   "Small budget, biggest room. This is the one for you."],
-      ["back",  4, "Mini",          null,       350, 53.5, 54.5, 16.8, 10,   "Small budget, biggest room. This is the one for you."],
-      ["back",  5, "Slaying",       null,       700, 33,   66,   36.2, 10,   "A bottom spot, but a wide one - built to catch the room."],
-      ["back",  6, "Mini",          null,       350, 29,   78.5, 20,   10.5, "Small budget, biggest room. This is the one for you."],
-      ["back",  7, "Mini",          null,       350, 52,   78.5, 20,   10.5, "Small budget, biggest room. This is the one for you."],
-    ];
-
-    /* A suit is a narrower canvas than a skirt, so the same layout is pulled
-       in towards the centre line rather than redrawn by hand. */
-    const narrowed = rows => rows.map(r => {
-      const [side, n, name, badge, floor, x, y, w, h, blurb] = r;
-      const k = 0.76, mid = 50;
-      return [side, n, name, badge, floor, mid + (x - mid) * k, y, w * k, h, blurb];
-    });
-
-    const spotsFor = (listingId, rows, priceMul) => rows.map(
-      ([side, n, name, badge, floor, x, y, w, h, blurb]) => ({
-        id: `${listingId}-${side}-${n}`, listing_id: listingId,
-        side, n, name, badge,
-        floor: Math.round(floor * priceMul / 25) * 25,
-        x: Math.round(x * 10) / 10, y, w: Math.round(w * 10) / 10, h, blurb,
-      }));
-
-    const day = n => new Date(Date.now() + n * 86400000).toISOString();
-    const dateOnly = n => day(n).slice(0, 10);
-
-    /* Three publishers rather than one, so the directory has something in it
-       the first time anybody opens the site with no database configured. */
-    const listings = [
+    /* Five people, photographed front and back, each with a couple of brands
+       already printed on them. The rectangles below are not decorative: every
+       one was placed against the actual photograph, on opaque fabric, clear of
+       hands, of bare arms, and of the sheer lace several of these gowns carry
+       across the shoulders. All numbers are percentages of the image. */
+    const PEOPLE = [
       {
-        id: "demo-mt", owner: "demo-owner",
-        names: "Maya & Tal", garment: "gown", wears: "female",
+        id: "demo-p1", person: "p1", garment: "gown", wears: "female",
+        names: "Maya & Tal", city: "Tel Aviv", venue: "Villa Bellosguardo",
+        inDays: 7, closesIn: 6, invited: 220, confirmed: 180, reach: 48000,
+        goal: 9200, rate: 250, front: 1.6, livestream: true,
         headline: "Walking billboard for your brand",
         tagline: "your logo on my dress, worn all day at our wedding in Tel Aviv",
-        city: "Tel Aviv", venue: "Beit Hatfutsot", venue_type: "Garden, 180 covers",
-        event_date: dateOnly(7),
-        invited: 220, confirmed: 180, shooters: "Noa Levi + a second shooter",
-        gallery: "Public gallery, ~40k views on the last two weddings",
-        reach: 48000, hashtag: "#mayaandtal", press: "Local lifestyle press confirmed",
-        livestream: true,
-        goal: 9200, closes_at: day(6),
         about: "I costed this wedding down to the napkin. The dress is the only line on the spreadsheet that can earn, so it is going to.",
         instagram: "mayaandtal", twitter: "mayaandtal",
-        layout: LAYOUT, priceMul: 1,
+        /* The V neckline bottoms out at y31 and the sleeves are sheer over
+           bare arms, so the chest box starts below the V and stays inside the
+           beaded panel at x43-57. The clasped hands cross the centre at
+           y47-55, so the lower box clears them too. */
+        sold: [
+          { side: "front", x: 44, y: 32, w: 13, h: 8,  brand: "Aurelia Coffee" },
+          { side: "front", x: 42, y: 62, w: 17, h: 10, brand: "Northbound" },
+          { side: "back",  x: 40, y: 45, w: 20, h: 12, brand: "Kite & Co" },
+        ],
       },
       {
-        id: "demo-ro", owner: "demo-owner-2",
-        names: "Roi Avital", garment: "suit", wears: "male",
+        id: "demo-p2", person: "p2", garment: "gown", wears: "female",
+        names: "Dana Halevi", city: "Caesarea", venue: "The Old Harbour",
+        inDays: 16, closesIn: 13, invited: 160, confirmed: 140, reach: 26000,
+        goal: 6800, rate: 210, front: 1.5, livestream: false,
+        headline: "One dress, one very long day",
+        tagline: "a harbour wedding, four photographers, and a dress nobody has looked away from yet",
+        about: "My sister did this and paid for her honeymoon with it. I am not too proud to copy her.",
+        instagram: "danahalevi", twitter: "",
+        /* The yoke above y26 is sheer illusion lace over skin; both boxes sit
+           on the lined part of the gown. */
+        sold: [
+          { side: "front", x: 44, y: 40, w: 14, h: 9,  brand: "Halcyon" },
+          { side: "back",  x: 38, y: 42, w: 22, h: 12, brand: "Fernwood" },
+        ],
+      },
+      {
+        id: "demo-p3", person: "p3", garment: "gown", wears: "female",
+        names: "Noa Lev", city: "Haifa", venue: "Congress Centre",
+        inDays: 21, closesIn: 18, invited: 900, confirmed: 720, reach: 120000,
+        goal: 14000, rate: 320, front: 1.7, livestream: true,
+        headline: "Keynote, front row, and the after-party",
+        tagline: "a stage with nine hundred people in front of it, and a talk that stays up for ever",
+        about: "The talk will outlive the day. Whatever is on the dress is in the thumbnail for as long as the video is up.",
+        instagram: "noalev", twitter: "noalev",
+        /* Plain matte satin between y24 and y36 - the best printing surface
+           in the whole set. */
+        sold: [
+          { side: "front", x: 44, y: 25, w: 13, h: 9,  brand: "Meridian Labs" },
+          { side: "front", x: 38, y: 60, w: 24, h: 12, brand: "Saltmarsh" },
+          { side: "back",  x: 34, y: 45, w: 26, h: 14, brand: "Orbit Studio" },
+        ],
+      },
+      {
+        id: "demo-p4", person: "p4", garment: "suit", wears: "male",
+        names: "Roi Avital", city: "Jerusalem", venue: "The Eden",
+        inDays: 12, closesIn: 10, invited: 260, confirmed: 240, reach: 31000,
+        goal: 6400, rate: 200, front: 1.6, livestream: true,
         headline: "Six hours on a stage, in your logo",
         tagline: "best man at two weddings and on a conference panel in the same fortnight",
-        city: "Jerusalem", venue: "The Eden, then DevDay", venue_type: "Ballroom, 240 covers",
-        event_date: dateOnly(12),
-        invited: 260, confirmed: 240, shooters: "House photographer and a film crew",
-        gallery: "Conference posts the full gallery",
-        reach: 31000, hashtag: "#roiinasuit", press: "",
-        livestream: true,
-        goal: 6400, closes_at: day(10),
-        about: "I am going to be photographed for six hours whether or not anyone pays me for it. This seemed the obvious thing to do about that.",
+        about: "I am going to be photographed for six hours whether or not anybody pays me for it. This seemed the obvious thing to do about that.",
         instagram: "roiavital", twitter: "",
-        layout: narrowed(LAYOUT), priceMul: 0.8,
+        /* The jacket hangs open, so the front box sits on the left panel
+           rather than the centre, and the unbroken jacket back takes the big
+           one. Navy: a light mark reads, a dark one vanishes. */
+        sold: [
+          { side: "front", x: 39, y: 26, w: 10, h: 9,  brand: "Cold Harbour" },
+          { side: "back",  x: 38, y: 26, w: 22, h: 16, brand: "Ridgeline" },
+        ],
       },
       {
-        id: "demo-nl", owner: "demo-owner-3",
-        names: "Noa Lev", garment: "suit", wears: "female",
-        headline: "Keynote, front row, and the after-party",
-        tagline: "a tailored suit on a stage with 900 people in front of it",
-        city: "Haifa", venue: "Congress Centre", venue_type: "Auditorium, 900 seats",
-        event_date: dateOnly(21),
-        invited: 900, confirmed: 720, shooters: "Conference crew, four cameras",
-        gallery: "Recorded talk stays up permanently",
-        reach: 120000, hashtag: "#noalevkeynote", press: "Two trade titles confirmed",
-        livestream: true,
-        goal: 14000, closes_at: day(18),
-        about: "The talk will outlive the day. Whatever is on the jacket is in the thumbnail for as long as the video is up.",
-        instagram: "noalev", twitter: "noalev",
-        layout: narrowed(LAYOUT), priceMul: 1.4,
+        id: "demo-p5", person: "p5", garment: "suit", wears: "male",
+        names: "Amit Barak", city: "Ramat Gan", venue: "The Glasshouse",
+        inDays: 30, closesIn: 26, invited: 140, confirmed: 120, reach: 18000,
+        goal: 4200, rate: 180, front: 1.5, livestream: false,
+        headline: "A grey suit with room on it",
+        tagline: "mid-grey takes a light logo or a dark one, which nothing else on this site can say",
+        about: "Smallest wedding here and the cheapest fabric on it. Somebody is getting a bargain.",
+        instagram: "amitbarak", twitter: "",
+        sold: [
+          { side: "front", x: 37, y: 27, w: 10, h: 9,  brand: "Pico Supply" },
+          { side: "back",  x: 38, y: 26, w: 22, h: 16, brand: "Two Rivers" },
+        ],
       },
     ];
 
-    const allSpots = [];
-    const rows = {};
-    for (const { layout, priceMul, ...L } of listings) {
-      rows[L.id] = Object.assign({
-        fee_percent: 8, currency: "usd", is_open: true,
-        photo_front: null, photo_back: null,
-      }, L);
-      allSpots.push(...spotsFor(L.id, layout, priceMul));
+    const day = n => new Date(Date.now() + n * 86400000).toISOString();
+    const listings = {}, spots = {}, bids = {};
+
+    for (const P of PEOPLE) {
+      const listing = {
+        id: P.id, owner: "demo-owner-" + P.person,
+        names: P.names, garment: P.garment, wears: P.wears,
+        headline: P.headline, tagline: P.tagline, about: P.about,
+        city: P.city, venue: P.venue,
+        event_date: day(P.inDays).slice(0, 10),
+        invited: P.invited, confirmed: P.confirmed, reach: P.reach,
+        livestream: P.livestream,
+        goal: P.goal, fee_percent: 8, currency: "usd",
+        rate_per_percent: P.rate, front_multiplier: P.front,
+        closes_at: day(P.closesIn),
+        is_open: true,
+        photo_front: "/assets/garments/" + P.person + "-front.jpg",
+        photo_back:  "/assets/garments/" + P.person + "-back.jpg",
+        instagram: P.instagram, twitter: P.twitter,
+      };
+      listings[listing.id] = listing;
+
+      P.sold.forEach((box, i) => {
+        const id = P.id + "-s" + (i + 1);
+        /* Priced by the same engine the page quotes with and the server
+           revalidates with, so a seeded spot cannot be worth something the
+           market itself would refuse. */
+        spots[id] = {
+          id, listing_id: P.id, side: box.side, n: i + 1,
+          name: box.brand, badge: null,
+          blurb: "Drawn by " + box.brand + " and printed on the " + box.side + ".",
+          x: box.x, y: box.y, w: box.w, h: box.h,
+          floor: Market.priceForBox(box, listing),
+          proposed_by: null, approved: true,
+        };
+        const bid = {
+          id: id + "-b", listing_id: P.id, spotId: id,
+          bidder: "demo-brand-" + i + "-" + P.person, brand: box.brand,
+          logo: null, max: Math.round(spots[id].floor * 1.35),
+          at: Date.now() - (i + 1) * 3600000,
+        };
+        bids[bid.id] = bid;
+      });
     }
 
-    save({
-      seeded: true,
-      users: {},
-      listings: rows,
-      spots: Object.fromEntries(allSpots.map(s => [s.id, s])),
-      bids: {},
-      messages: {},
-    });
+    save({ seeded: true, users: {}, listings, spots, bids, messages: {} });
   }
+
 
   /* ================================================================== auth */
   async function refreshSession() {
@@ -442,6 +472,26 @@ window.Store = (function () {
       }
       const d = db(); delete d.spots[id]; save(d);
     },
+
+    /* Saying no to a rectangle somebody drew.
+
+       NOT a delete. `bids.spot_id` cascades, so deleting the spot deletes the
+       bids on it and takes `stripe_payment_intent` with them - after which the
+       hold on that sponsor's card cannot be cancelled by anybody, while the
+       page claims it was released. The server cancels the authorisations with
+       the secret key and then marks the row. */
+    async decline(id) {
+      const res = await api("/api/decline/" + encodeURIComponent(id));
+      if (res.demo) {
+        if (mode === "supabase") {
+          throw new Error(res.reason || "The server could not release their card. Nothing was declined — try again.");
+        }
+        const d = db();
+        if (d.spots[id]) { d.spots[id].declined = true; save(d); }
+        return { ok: true, demo: true, released: 0 };
+      }
+      return res;
+    },
   };
 
   /* ================================================================ photos
@@ -540,9 +590,13 @@ window.Store = (function () {
       return out;
     },
 
-    /* The server validates, holds the money, and writes the row. */
-    async place({ listingId, spotId, max, brand, logo }) {
-      const res = await api("/api/bid", { listingId, spotId, max, brand, logo });
+    /* The server validates, holds the money, and writes the row.
+
+       `draw` is a rectangle the brand dragged on the photograph rather than an
+       existing spot. The server prices it from its area and creates the spot
+       itself - the browser sends the shape, never the price. */
+    async place({ listingId, spotId, draw, max, brand, logo }) {
+      const res = await api("/api/bid", { listingId, spotId, draw, max, brand, logo });
 
       /* The demo fallback is ONLY for a demo. When a real database is behind
          this, a 503 or a dropped connection means the bid did not happen, and
@@ -553,7 +607,28 @@ window.Store = (function () {
           throw new Error(res.reason || "The server could not take that bid. Nothing was charged — try again.");
         }
         const d = db();
-        const bid = { id: "b-" + uid(), listing_id: listingId, spotId, bidder: session.id, brand, logo: logo || null, max: Number(max), at: Date.now() };
+        let id = spotId;
+
+        /* Demo mode has no server to create the drawn spot, so it does here
+           what the server does there - including pricing it from its area,
+           using the same engine, so the two modes cannot drift. */
+        if (draw) {
+          const listing = (d.listings || {})[listingId] || {};
+          const onSide = Object.values(d.spots || {})
+            .filter(s => s.listing_id === listingId && s.side === draw.side);
+          const spot = {
+            id: "s-" + uid(), listing_id: listingId, side: draw.side,
+            n: onSide.length + 1, name: "Brand spot", badge: null,
+            blurb: "Drawn by the brand that bought it.",
+            x: draw.x, y: draw.y, w: draw.w, h: draw.h,
+            floor: Market.priceForBox(draw, listing),
+            proposed_by: session.id, approved: false,
+          };
+          d.spots = d.spots || {}; d.spots[spot.id] = spot;
+          id = spot.id;
+        }
+
+        const bid = { id: "b-" + uid(), listing_id: listingId, spotId: id, bidder: session.id, brand, logo: logo || null, max: Number(max), at: Date.now() };
         d.bids = d.bids || {}; d.bids[bid.id] = bid; save(d);
         return { ...res, bid };
       }

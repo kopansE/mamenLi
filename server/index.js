@@ -15,6 +15,7 @@
  * reports that nothing is configured and the front end stays in demo mode.
  */
 const path = require("path");
+const fs = require("fs");
 const crypto = require("crypto");
 
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
@@ -199,11 +200,12 @@ app.use(cookieParser());
 
 /* ================================================================ rate limits
    A ladder rather than one number: reading is cheap, bidding is not. */
-const limiter = (max, windowMs = 60_000, message = "Too many requests. Slow down.", keyGenerator) =>
+const limiter = (max, windowMs = 60_000, message = "Too many requests. Slow down.", keyGenerator, skip) =>
   rateLimit({
     windowMs, max, standardHeaders: true, legacyHeaders: false,
     message: { error: message },
     ...(keyGenerator ? { keyGenerator } : {}),
+    ...(skip ? { skip } : {}),
   });
 
 /* Bidding is keyed on the account, not the address: one person behind one IP
@@ -218,8 +220,26 @@ const byAccount = req => {
   return "ip:" + (req.ip || "unknown");
 };
 
+/* A drawn box is not a bid, it is a WRITE. Every one of them that gets past
+   validation is a permanent rectangle on a stranger's wedding clothes, so it
+   is rationed harder than an ordinary bid: 12 a minute would be 12 rectangles
+   a minute, and a publisher waking up to a garment tiled edge to edge with
+   pending requests has been vandalised whether or not any of them is approved.
+
+   Four a minute, keyed on the account like the bid limiter above. A brand
+   drawing in good faith draws once, and redraws once or twice if the box came
+   back too small or landed on somebody else - the page runs the same
+   validateBox before it ever posts, so a refusal here means either a race
+   with another brand or a client that has been tampered with. Neither needs a
+   fifth attempt inside the same minute. The 12/min bid ceiling still applies
+   on top, so this only ever tightens. */
+const isDrawnBox = req => !!(req.body && req.body.draw && typeof req.body.draw === "object"
+  && !Array.isArray(req.body.draw));
+
 app.use("/api", limiter(240));
 app.use("/api/bid", limiter(12, 60_000, "Too many bids in a minute. Wait a moment.", byAccount));
+app.use("/api/bid", limiter(4, 60_000, "Too many spots drawn in a minute. Wait a moment.",
+  byAccount, req => !isDrawnBox(req)));
 app.use("/api/chat", limiter(40));
 app.use("/api/settle", limiter(6, 60_000, "Too many settlement attempts."));
 
@@ -311,12 +331,27 @@ app.get("/api/config", (req, res) => {
    The one endpoint that matters. It reads the listing, the spot and every
    live bid from its own database, revalidates with the shared engine, and
    only then asks Stripe for money. Nothing the client sent is used as a
-   price - only as an intent. */
+   price - only as an intent.
+
+   It now takes two shapes of request, and they are told apart by ONE thing:
+   whether the body carries a `draw` object.
+
+     { listingId, spotId, max, brand }                    bid on a spot that
+                                                          already exists
+     { listingId, draw:{side,x,y,w,h}, max, brand }        draw the rectangle
+                                                          you want, then bid
+                                                          on it
+
+   A body carrying both takes the drawn path - `draw` is the more specific
+   intent, and a stray spotId beside it is never read. The second shape is
+   the product now; the first is kept because a spot a brand drew last week is
+   an ordinary spot that anybody may bid on. */
 app.post("/api/bid", requireCsrf, requireUser, async (req, res) => {
   if (!stripe) return res.status(503).json({ error: "Payments are not configured.", demo: true });
 
-  const { listingId, spotId, max, brand, logo } = req.body || {};
-  if (typeof listingId !== "string" || typeof spotId !== "string")
+  const { listingId, spotId, draw, max, brand, logo } = req.body || {};
+  const drawn = isDrawnBox(req);
+  if (typeof listingId !== "string" || (!drawn && typeof spotId !== "string"))
     return res.status(400).json({ error: "Which spot?" });
   if (typeof brand !== "string" || !brand.trim() || brand.length > 60)
     return res.status(400).json({ error: "A brand name is required." });
@@ -331,17 +366,109 @@ app.post("/api/bid", requireCsrf, requireUser, async (req, res) => {
   if (!listing.is_open) return res.status(409).json({ error: "Bidding on this listing is closed." });
   /* You cannot bid your own garment up. Roles are frozen at sign-up, but an
      owner could still hold a second account, so this checks ownership rather
-     than trusting the role alone. */
+     than trusting the role alone. This guard is why the drawn path reuses
+     this route rather than getting one of its own: an owner drawing a spot on
+     their own dress and bidding it up is the same shill it always was. */
   if (listing.owner === req.user.id)
     return res.status(403).json({ error: "You cannot bid on your own listing." });
 
-  const { data: spot, error: sErr } = await db.from("spots").select("*").eq("id", spotId).single();
-  if (sErr || !spot || spot.listing_id !== listingId)
-    return res.status(404).json({ error: "No such spot on that listing." });
+  let spot = null;
+  /* Set only on the drawn path, and only once the row really exists. It is
+     what the cleanup at the bottom deletes if anything after this fails. */
+  let created = null;
+
+  if (drawn) {
+    /* A brand draws on a photograph. Half a garment photographed is half a
+       garment that cannot be drawn on at all, and a listing that opened with
+       one side missing would sell the front twice. */
+    if (!listing.photo_front || !listing.photo_back)
+      return res.status(409).json({ error: "This garment is not photographed yet." });
+
+    /* One read for both jobs: the neighbours the box must not overlap, and
+       the highest number already used on that side. Filtering the side here
+       rather than in the query means a `side` the client invented comes back
+       as an empty neighbour list and is then refused by validateBox on the
+       side rule itself, instead of being quietly priced as a back. */
+    const { data: allSpots, error: spErr } = await db.from("spots").select("*").eq("listing_id", listingId);
+    if (spErr) return res.status(500).json({ error: "Could not read the garment." });
+
+    const box = {
+      side: draw.side,
+      x: Number(draw.x), y: Number(draw.y), w: Number(draw.w), h: Number(draw.h),
+    };
+    const onThisSide = (allSpots || []).filter(s => s.side === box.side);
+
+    /* The page ran this exact function before it posted. Running it again
+       here is the whole point of sharing market.js: the browser says WHERE,
+       never what that costs or whether it is allowed. */
+    const check = Market.validateBox(box, listing, onThisSide);
+    if (!check.ok) return res.status(400).json({ error: check.reason });
+
+    /* `spots.floor` is `>= 1` in the schema and settle() lifts anything below
+       MIN_BID to MIN_BID anyway, so a publisher who has set their rate to
+       zero gets a one-unit floor rather than a constraint violation and a
+       500 the brand cannot act on. */
+    const floor = Math.max(Market.priceForBox(box, listing), Market.RULES.MIN_BID);
+    const n = (onThisSide.reduce((m, s) => Math.max(m, Number(s.n) || 0), 0)) + 1;
+
+    const { data: row, error: cErr } = await db.from("spots").insert({
+      listing_id: listingId,
+      side: box.side,
+      n,
+      name: "Brand spot",
+      x: box.x, y: box.y, w: box.w, h: box.h,
+      floor,
+      /* Who asked, and the fact that nobody has said yes yet. The publisher
+         approves or declines through their own RLS update policy; until then
+         the rectangle is claimed but not agreed to. */
+      proposed_by: req.user.id,
+      approved: false,
+    }).select().single();
+
+    if (cErr || !row) {
+      console.error("could not create a drawn spot:", cErr && cErr.message);
+      return res.status(500).json({ error: "Could not reserve that space." });
+    }
+    spot = row;
+    created = row.id;
+  } else {
+    const { data: row, error: sErr } = await db.from("spots").select("*").eq("id", spotId).single();
+    if (sErr || !row || row.listing_id !== listingId)
+      return res.status(404).json({ error: "No such spot on that listing." });
+    spot = row;
+  }
+
+  const out = await placeBid({ req, listing, spot, brand: brand.trim(), max });
+
+  /* Nothing is left behind on somebody's dress. The rectangle only exists
+     because this bid was about to be made; if the bid did not happen - too
+     low, Stripe refused, anything - the rectangle has no reason to be there,
+     and a publisher should not have to decline a spot nobody ever bid on. */
+  if (created && out.status >= 400) {
+    /* Loud on failure, and checked BOTH ways: supabase-js reports a refused
+       delete in `error` rather than by throwing, so a try/catch on its own
+       would have reported every orphan as a clean sweep. */
+    try {
+      const { error: dErr } = await db.from("spots").delete().eq("id", created);
+      if (dErr) throw new Error(dErr.message);
+    } catch (err) {
+      console.error("ORPHANED SPOT", created, "on listing", listingId, "-", err.message);
+    }
+  }
+
+  return res.status(out.status).json(out.body);
+});
+
+/* The bid itself, unchanged by where the spot came from. Answers
+   { status, body } rather than writing the response, so the caller can undo a
+   spot it had to create first. */
+async function placeBid({ req, listing, spot, brand, max }) {
+  const listingId = listing.id;
+  const spotId = spot.id;
 
   const { data: rows, error: bErr } = await db.from("bids").select("*")
     .eq("spot_id", spotId).eq("withdrawn", false).in("status", ["held", "captured"]);
-  if (bErr) return res.status(500).json({ error: "Could not read the market." });
+  if (bErr) return { status: 500, body: { error: "Could not read the market." } };
 
   const bids = (rows || []).map(b => ({
     id: b.id, bidder: b.bidder, brand: b.brand, logo: b.logo_url,
@@ -355,9 +482,9 @@ app.post("/api/bid", requireCsrf, requireUser, async (req, res) => {
     listingClosed: !listing.is_open,
   };
   const verdict = Market.evaluate(spotForEngine, bids, {
-    bidder: req.user.id, brand: brand.trim(), max: Number(max),
+    bidder: req.user.id, brand, max: Number(max),
   });
-  if (!verdict.ok) return res.status(400).json({ error: verdict.reason, minimum: verdict.minimum });
+  if (!verdict.ok) return { status: 400, body: { error: verdict.reason, minimum: verdict.minimum } };
 
   /* --- money ----------------------------------------------------------
      We authorise the bidder's MAXIMUM, then capture only the price that
@@ -368,7 +495,7 @@ app.post("/api/bid", requireCsrf, requireUser, async (req, res) => {
   const hold = Market.quote(verdict.max, feePct);
   const currency = currencyFor(listing);
   const amount = minorUnits(hold.total, currency);
-  if (amount < minorUnits(1, currency)) return res.status(400).json({ error: "Below the minimum charge." });
+  if (amount < minorUnits(1, currency)) return { status: 400, body: { error: "Below the minimum charge." } };
 
   const base = PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
   /* The price is in the key: a retry after the market has moved must open a
@@ -400,7 +527,7 @@ app.post("/api/bid", requireCsrf, requireUser, async (req, res) => {
       }],
       metadata: {
         listingId, spotId, bidder: req.user.id,
-        brand: brand.trim(), max: String(verdict.max),
+        brand, max: String(verdict.max),
         /* The bidder's OWN stored mark, read from the profile we verified -
            never req.body.logo. A client-supplied URL ends up as an <img src>
            on every visitor's page, which is a free tracking beacon (and,
@@ -412,12 +539,15 @@ app.post("/api/bid", requireCsrf, requireUser, async (req, res) => {
       cancel_url: `${base}/?l=${encodeURIComponent(listingId)}&paid=0`,
     }, { idempotencyKey: idem });
 
-    res.json({ url: session.url, id: session.id, price: verdict.price, max: verdict.max });
+    return {
+      status: 200,
+      body: { url: session.url, id: session.id, price: verdict.price, max: verdict.max, spotId },
+    };
   } catch (err) {
     console.error("checkout failed:", err.message);
-    res.status(502).json({ error: "Could not start checkout." });
+    return { status: 502, body: { error: "Could not start checkout." } };
   }
-});
+}
 
 /* ============================================================ webhook bodies */
 
@@ -549,6 +679,72 @@ async function extendForSnipe(spotId) {
   }
 }
 
+/* =================================================================== decline
+   The wearer says no to a rectangle somebody drew on them.
+
+   This has to be a server route rather than a PostgREST write, for one
+   reason: the authorisation on the sponsor's card can only be cancelled with
+   the Stripe secret key, and that key never leaves this process. The studio
+   used to DELETE the spot instead, which cascaded to the bids and took
+   `stripe_payment_intent` with it - after which nothing on earth could
+   release the hold, while the page cheerfully said it had.
+
+   The row is kept and marked. Both sides keep the record of what was asked
+   and what was answered, and a declined rectangle stops blocking the fabric
+   so somebody else can draw there.
+   ========================================================================= */
+app.post("/api/decline/:spotId", requireCsrf, requireUser, async (req, res) => {
+  const { spotId } = req.params;
+
+  const { data: spot } = await db.from("spots").select("*").eq("id", spotId).single();
+  if (!spot) return res.status(404).json({ error: "No such spot." });
+
+  /* Only the person wearing the garment may refuse what goes on it. */
+  const { data: listing } = await db.from("listings").select("id, owner").eq("id", spot.listing_id).single();
+  if (!listing || listing.owner !== req.user.id) {
+    return res.status(403).json({ error: "That is not your garment." });
+  }
+  if (spot.approved === true) {
+    return res.status(409).json({ error: "That one is already accepted. It settles with the rest." });
+  }
+  if (spot.declined) return res.json({ ok: true, released: 0, alreadyDeclined: true });
+
+  const { data: rows } = await db.from("bids").select("*").eq("spot_id", spotId);
+
+  /* Release the money BEFORE marking the row. If the cancel fails we want the
+     spot still visibly pending, so the next attempt tries again - marking it
+     first would leave a released-looking rectangle with a live hold behind it,
+     which is the exact failure this route exists to end. */
+  const released = [], failed = [];
+  for (const row of rows || []) {
+    if (row.status !== "held") continue;
+    try {
+      if (stripe && row.stripe_payment_intent) {
+        await stripe.paymentIntents.cancel(row.stripe_payment_intent);
+      }
+      await db.from("bids").update({
+        status: "released", released_at: new Date().toISOString(),
+      }).eq("id", row.id);
+      released.push({ brand: row.brand, amount: Number(row.max_amount) });
+    } catch (err) {
+      console.error("DECLINE: could not release", row.id, row.brand, "-", err.message);
+      failed.push(row.brand);
+    }
+  }
+
+  if (failed.length) {
+    return res.status(502).json({
+      error: "We could not release " + failed.join(", ") + " just yet. Nothing was declined - try again in a moment.",
+    });
+  }
+
+  const { error } = await db.from("spots")
+    .update({ declined: true, declined_at: new Date().toISOString() }).eq("id", spotId);
+  if (error) return res.status(500).json({ error: "Released their card, but could not mark it declined." });
+
+  res.json({ ok: true, released: released.length, brands: released.map(r => r.brand) });
+});
+
 /* ==================================================================== settle
    Run at (or after) close: capture the holder at the price that settled,
    which is normally less than the maximum they authorised. Protected by a
@@ -579,15 +775,43 @@ app.post("/api/settle/:listingId", async (req, res) => {
   const bidsBySpot = {};
   for (const [id, st] of Object.entries(states)) if (st) bidsBySpot[id] = st.bids;
 
+  /* A spot the wearer never accepted is not part of this campaign: it is not
+     on the page, it is not in the goal the page shows, and its money must not
+     be counted towards whether the goal was met. Counting it here would let a
+     pile of unapproved requests drag a campaign over the line and capture the
+     cards of everyone who WAS accepted. */
+  const approved = (spots || []).filter(s => s.approved !== false);
+
   /* Goal not met means nobody is charged. That is the promise on the page. */
   const totals = Market.campaign(
-    (spots || []).map(s => ({ id: s.id, floor: Number(s.floor) })), bidsBySpot, listing.goal);
+    approved.map(s => ({ id: s.id, floor: Number(s.floor) })), bidsBySpot, listing.goal);
 
   const out = { captured: [], released: [], skipped: [], goalMet: totals.met, raised: totals.raised };
 
   for (const spot of spots || []) {
     const st = states[spot.id];
     if (!st || !st.rows.length) continue;
+
+    /* Never charge for a patch of somebody's clothing they did not agree to.
+       A drawn spot arrives approved=false and stays that way until the wearer
+       says yes; if the campaign closes while it is still waiting, the answer
+       is no, and every authorisation behind it is released. Without this the
+       settlement job captured cards for placements that were never accepted
+       and could never be printed. */
+    if (spot.approved === false) {
+      for (const row of st.rows) {
+        if (row.status !== "held") continue;
+        try {
+          await stripe.paymentIntents.cancel(row.stripe_payment_intent);
+          await db.from("bids").update({ status: "released", released_at: new Date().toISOString() }).eq("id", row.id);
+          out.released.push({ brand: row.brand, spot: spot.n, reason: "never accepted" });
+        } catch (err) {
+          console.error("RELEASE FAILED for unaccepted bid", row.id, row.brand, "-", err.message);
+          out.skipped.push({ spot: spot.n, brand: row.brand, error: err.message });
+        }
+      }
+      continue;
+    }
 
     /* Respect a per-spot anti-snipe extension: a spot whose clock is still
        running has not finished, and capturing it early would cut off a bid
@@ -681,16 +905,90 @@ app.post("/api/chat/:id", requireCsrf, requireUser, (req, res) => {
   res.json({ message: msg });
 });
 
-/* =================================================================== the site */
+/* =================================================================== the site
+
+   Cache busting, and why it is not optional here.
+
+   index.html is revalidated on every load, but the CSS and JS it points at
+   used to be cached for five minutes under their own unchanging URLs. That
+   gap is not theoretical: a deploy put new markup in front of the previous
+   build's app.js, which threw on the first element that no longer existed,
+   and every screen stayed hidden. The visitor got a header, a footer and
+   nothing in between - and no error they could see.
+
+   So the page names its assets with the build that produced them. Those URLs
+   are immutable and cached for a year; the next build asks for different
+   ones. An unversioned request still works, but must revalidate, so no stale
+   copy can outlive a deploy. */
+const BUILD_AT_BOOT = (process.env.RENDER_GIT_COMMIT || "").slice(0, 7) || buildIdFromDisk();
+/* Fixed in production, where the files cannot change under us. Recomputed per
+   request in development, so saving a stylesheet changes the stamp the page
+   asks for instead of leaving a year-long immutable copy of the old one in
+   the browser. */
+const buildId = () => PROD ? BUILD_AT_BOOT : buildIdFromDisk();
+
+/* Render hands us the commit. Locally there is none, so the assets hash
+   themselves - which is better anyway during development, because it changes
+   the moment a file does rather than at the next commit. */
+function buildIdFromDisk() {
+  const h = crypto.createHash("sha1");
+  for (const f of ["assets/css/app.css", "assets/js/app.js",
+                   "assets/js/store.js", "assets/js/market.js"]) {
+    try { h.update(fs.readFileSync(path.join(PUBLIC, f))); }
+    catch { /* a checkout without one of them still has to boot */ }
+  }
+  return h.digest("hex").slice(0, 8);
+}
+
+/* The one page, with its asset URLs stamped. Built once in production, where
+   it cannot change under a running process and a deploy is a new process.
+
+   In development it is rebuilt every request, because the cached version is
+   the same trap this whole section exists to close, just moved: edit
+   index.html, and the server keeps serving the copy it read at boot while
+   express.static happily hands out the app.js you just saved. New markup,
+   old page, and a null element takes the script out on load. */
+let INDEX_HTML = null;
+function indexHtml() {
+  if (INDEX_HTML && PROD) return INDEX_HTML;
+  const raw = fs.readFileSync(path.join(PUBLIC, "index.html"), "utf8");
+  INDEX_HTML = raw.replace(
+    /\b(href|src)="(assets\/(?:css|js)\/[^"?]+\.(?:css|js))"/g,
+    (_m, attr, url) => `${attr}="${url}?v=${buildId()}"`);
+  return INDEX_HTML;
+}
+
+/* Ahead of express.static, so /index.html gets the stamped copy too rather
+   than the raw file off disk. */
+const sendIndex = (_req, res) => {
+  res.set("Cache-Control", "no-cache").type("html").send(indexHtml());
+};
+app.get("/", sendIndex);
+app.get("/index.html", sendIndex);
+
+app.use((req, res, next) => {
+  /* Only production ever hands out an immutable year-long cache. In
+     development a correct stamp still has to revalidate, or an edit made
+     after the page was loaded is invisible until the cache is cleared. */
+  res.locals.versioned = PROD && req.query && req.query.v === BUILD_AT_BOOT;
+  next();
+});
+
 app.use(express.static(PUBLIC, {
   extensions: ["html"],
   dotfiles: "deny",
   index: false,
   setHeaders(res, filePath) {
-    if (/\.(css|js)$/.test(filePath)) res.setHeader("Cache-Control", "public, max-age=300");
+    if (/\.(css|js)$/.test(filePath)) {
+      res.setHeader("Cache-Control", res.locals.versioned
+        ? "public, max-age=31536000, immutable"
+        : "no-cache");
+    } else if (/\.(jpe?g|png|webp|avif|gif|svg|woff2?)$/.test(filePath)) {
+      /* Photographs and fonts are replaced by name, not edited in place. */
+      res.setHeader("Cache-Control", "public, max-age=86400");
+    }
   },
 }));
-app.get("/", (_req, res) => res.sendFile(path.join(PUBLIC, "index.html")));
 
 app.use((err, _req, res, _next) => {
   /* body-parser already put the right status on the error: 400 for malformed

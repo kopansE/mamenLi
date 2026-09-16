@@ -136,6 +136,8 @@ choose their own rate-limit bucket, which silently disables every limit.
 | `20260916180000_role_chosen_once` | OAuth users pick a side once, then it freezes |
 | `20260916190000_fix_role_locked_null` | fixed a NULL bug in the above that broke **all** sign-ups |
 | `20260916200000_garment_is_worn_by_someone` | added `listings.wears` — who the garment is cut for, which `garment` had been guessing |
+| `20260916210000_brands_draw_their_own_spots` | `listings.rate_per_percent` + `front_multiplier`, `spots.proposed_by` + `approved`. The sponsor draws the rectangle now and its area sets the price |
+| `20260916220000_declining_is_not_deleting` | `spots.declined` — refusing a sponsor releases their card instead of deleting the row, which used to cascade to the bid and strand the hold |
 
 **Never edit a migration that has run.** Add a new one beside it.
 

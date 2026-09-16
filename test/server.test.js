@@ -20,6 +20,11 @@
                  behind requireUser, which answers 503 the moment there is no
                  database - so without a stand-in, the one endpoint that
                  decides prices and takes money cannot be tested at all.
+     draw  8793  the same, but pointed at a WRITABLE stand-in defined at the
+                 bottom of this file. A brand drawing its own box creates a
+                 spot before it can bid on one, so that path has to read its
+                 own row back and, when the bid then fails, delete it again -
+                 none of which a fake that only records writes can show.
 
    The prod server is deliberately never asked to do anything that would
    touch the network: its Supabase URL does not resolve, and express 4 does
@@ -450,10 +455,38 @@ describe("only public/ is ever served", () => {
       const res = await fetch(srv.base + p);
       assert.equal(res.status, 200);
       assert.match(res.headers.get("content-type") || "", type);
-      assert.match(res.headers.get("cache-control") || "", /max-age=300/);
+      /* Unversioned, so it MUST revalidate. A deploy once put new markup in
+         front of the previous build's app.js and every screen stayed hidden;
+         a five-minute cache on a URL that never changes is what allowed a
+         stale copy to outlive the deploy that replaced it. */
+      assert.match(res.headers.get("cache-control") || "", /no-cache/);
       assert.ok((await res.text()).length > 100);
     });
   }
+
+  it("an asset stamped with the running build is cached for a year instead", async () => {
+    /* The page names its assets with the build that produced them, and those
+       URLs are immutable. The stamp is taken from the page itself rather than
+       computed here, which also proves the two halves agree: a stamp the
+       static handler does not recognise would be served `no-cache` forever
+       and the year-long cache would quietly never happen.
+
+       Asked of the PRODUCTION server, because only production hands out the
+       year. In development a correct stamp still has to revalidate, or an edit
+       made after the page was loaded stays invisible until the cache is
+       cleared - the same trap this mechanism exists to close, moved from the
+       deploy to the editor. */
+    const html = await (await fetch(`${prod.base}/`)).text();
+    const stamped = [...html.matchAll(/<script[^>]+src="(assets\/js\/[^"]+\?v=[^"]+)"/g)].map(m => m[1]);
+    assert.ok(stamped.length, "the page no longer stamps its scripts with a build id");
+
+    for (const src of stamped) {
+      const res = await fetch(`${prod.base}/${src}`);
+      assert.equal(res.status, 200, `${src} answered ${res.status}`);
+      assert.match(res.headers.get("cache-control") || "", /immutable/, `${src} was not cached`);
+      await res.arrayBuffer();
+    }
+  });
 
   it("serves every script tag the page actually asks for", async () => {
     const html = await (await fetch(`${srv.base}/`)).text();
@@ -1013,5 +1046,722 @@ describe("chat", () => {
       assert.equal(res.status, 200, `since=${q} answered ${res.status}`);
       await res.arrayBuffer();
     }
+  });
+});
+
+/* =========================================================================
+   POST /api/bid with a DRAWN BOX.
+
+   The product changed shape: the publisher no longer lays out numbered
+   rectangles. A brand drags out the box it wants, anywhere on the front or
+   the back photograph, and the price follows from the area it covers. The
+   same endpoint now takes two shapes of request, told apart by whether the
+   body carries a `draw` object:
+
+       { listingId, spotId, max, brand }               bid on what exists
+       { listingId, draw:{side,x,y,w,h}, max, brand }   draw it, then bid
+
+   The drawn shape WRITES: it creates a spot before it can bid on one. That
+   is why it gets its own server and its own stand-in database here - the
+   fake in helpers/ deliberately records writes without applying them, which
+   is the right thing for every other test on this page and useless for a
+   path that has to read its own row back and then delete it again.
+
+   As everywhere else on this page, nothing reaches Stripe: every drawn box
+   below is either refused by the rules or carries a maximum under its own
+   computed floor, which is exactly the case the orphan cleanup exists for.
+   ========================================================================= */
+
+/* 8792 belongs to test/e2e.browser.test.js. node --test runs test FILES in
+   parallel, so sharing it does not fail cleanly - whichever server binds
+   second dies of EADDRINUSE while the suite happily talks to the first one
+   and asserts against a process configured for something else entirely.
+   This exact collision has already cost an afternoon on this project. */
+const PORT_DRAW = 8793;
+const PORT_DECLINE = 8794;
+
+/* ------------------------------------------------- a writable stand-in db
+   PostgREST, as much of it as the drawn path uses: the same eq/in filters as
+   helpers/fake-supabase.js, plus inserts that persist and come back through
+   `Prefer: return=representation`, and deletes that really remove the row.
+   Without the insert answering with the stored row, `.insert().select()
+   .single()` resolves to nothing and the server can never learn the id of
+   the spot it just created - which is the id the cleanup deletes. */
+async function startWritableSupabase(seed = {}) {
+  const http = require("node:http");
+  const tables = seed.tables || {};
+  const tokens = seed.tokens || {};
+  const users = seed.users || {};
+  const writes = [];
+  let ids = 0;
+
+  const matches = (row, filters) => filters.every(([col, op, val]) => {
+    const cell = row[col];
+    if (op === "eq") return String(cell) === val;
+    if (op === "neq") return String(cell) !== val;
+    if (op === "in") {
+      const set = val.replace(/^\(|\)$/g, "").split(",").map(s => s.replace(/^"|"$/g, ""));
+      return set.includes(String(cell));
+    }
+    if (op === "is") return val === "null" ? cell == null : String(cell) === val;
+    return true;
+  });
+
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url, "http://fake");
+    const send = (status, body) => {
+      res.writeHead(status, { "content-type": "application/json" });
+      res.end(body === undefined ? "" : JSON.stringify(body));
+    };
+
+    if (url.pathname === "/auth/v1/user") {
+      const auth = req.headers.authorization || "";
+      const id = tokens[auth.startsWith("Bearer ") ? auth.slice(7) : ""];
+      if (!id) return send(401, { code: 401, msg: "invalid claim: missing sub claim" });
+      return send(200, users[id] || { id, email: `${id}@example.test`, aud: "authenticated" });
+    }
+
+    const rest = url.pathname.match(/^\/rest\/v1\/([A-Za-z0-9_]+)$/);
+    if (!rest) return send(404, { message: "not found" });
+    const table = rest[1];
+    if (!tables[table]) tables[table] = [];
+
+    const filters = [];
+    for (const [key, raw] of url.searchParams) {
+      if (["select", "order", "limit", "offset", "on_conflict", "columns"].includes(key)) continue;
+      const i = raw.indexOf(".");
+      if (i > 0) filters.push([key, raw.slice(0, i), raw.slice(i + 1)]);
+    }
+    const single = /pgrst\.object/.test(req.headers.accept || "");
+    const wantsRows = /return=representation/.test(req.headers.prefer || "");
+
+    if (req.method === "GET") {
+      const hit = tables[table].filter(r => matches(r, filters));
+      if (single) {
+        if (hit.length !== 1) {
+          return send(406, {
+            code: "PGRST116", details: "The result contains 0 rows", hint: null,
+            message: "JSON object requested, multiple (or no) rows returned",
+          });
+        }
+        return send(200, hit[0]);
+      }
+      return send(200, hit);
+    }
+
+    let raw = "";
+    req.on("data", c => { raw += c; });
+    req.on("end", () => {
+      let parsed = null;
+      try { parsed = raw ? JSON.parse(raw) : null; } catch { parsed = null; }
+      writes.push({ method: req.method, table, filters, body: raw, rows: [].concat(parsed || []) });
+
+      let touched = [];
+      if (req.method === "POST") {
+        touched = [].concat(parsed || []).map(row => {
+          const stored = Object.assign({ id: `GEN-${++ids}` }, row);
+          tables[table].push(stored);
+          return stored;
+        });
+      } else if (req.method === "PATCH") {
+        touched = tables[table].filter(r => matches(r, filters));
+        for (const row of touched) Object.assign(row, parsed || {});
+      } else if (req.method === "DELETE") {
+        touched = tables[table].filter(r => matches(r, filters));
+        tables[table] = tables[table].filter(r => !matches(r, filters));
+      }
+
+      if (!wantsRows) { res.writeHead(204).end(); return; }
+      return single ? send(200, touched[0]) : send(200, touched);
+    });
+  });
+
+  await new Promise(r => server.listen(0, "127.0.0.1", r));
+  return {
+    url: `http://127.0.0.1:${server.address().port}`,
+    writes, tables,
+    spots: () => tables.spots,
+    wrote: (method, table) => writes.filter(w => w.method === method && w.table === table),
+    stop: () => new Promise(r => server.close(r)),
+  };
+}
+
+describe("POST /api/bid with a drawn box", () => {
+  const DRAWER = "44444444-4444-4444-4444-444444444444";   // the brand drawing
+  const HOST = "55555555-5555-5555-5555-555555555555";     // the publisher
+
+  const RATE = 250;
+  const FRONT_MUL = 1.6;
+
+  /* A fresh token per request so the account-keyed limiters do not turn these
+     into order-dependent tests - the drawn-box limiter is exercised on its
+     own dedicated token at the bottom. */
+  let drawSeq = 0;
+  const drawTokens = {};
+  const tokenAs = who => {
+    const t = `draw-${who}-${++drawSeq}`;
+    drawTokens[t] = who === "brand" ? DRAWER : HOST;
+    return t;
+  };
+  for (const who of ["brand", "host"]) for (let i = 0; i < 60; i++) tokenAs(who);
+  /* Its own bucket, spent deliberately by the rate-limit test. */
+  const LIMIT_TOKEN = "draw-brand-ratelimit";
+  drawTokens[LIMIT_TOKEN] = DRAWER;
+
+  const photos = {
+    photo_front: "https://example.test/storage/front.jpg",
+    photo_back: "https://example.test/storage/back.jpg",
+  };
+  const closes = new Date(Date.now() + 7 * 86400000).toISOString();
+
+  const seed = () => ({
+    tokens: drawTokens,
+    users: {
+      [DRAWER]: { id: DRAWER, email: "brand@acme.test", aud: "authenticated" },
+      [HOST]: { id: HOST, email: "host@example.test", aud: "authenticated" },
+    },
+    tables: {
+      profiles: [
+        { id: DRAWER, role: "brand", display_name: "Acme", brand: "Acme", logo_url: null },
+        { id: HOST, role: "client", display_name: "Maya", brand: null, logo_url: null },
+      ],
+      listings: [
+        {
+          id: "L-DRAW", owner: HOST, names: "Maya & Tal", garment: "gown", is_open: true,
+          goal: 9200, fee_percent: 8, currency: "usd", closes_at: closes,
+          rate_per_percent: RATE, front_multiplier: FRONT_MUL, ...photos,
+        },
+        /* Open, but only half photographed: there is nothing to draw on. */
+        {
+          id: "L-HALF", owner: HOST, names: "Half", garment: "suit", is_open: true,
+          goal: 100, fee_percent: 8, currency: "usd", closes_at: closes,
+          rate_per_percent: RATE, front_multiplier: FRONT_MUL,
+          photo_front: photos.photo_front, photo_back: null,
+        },
+        {
+          id: "L-DONE", owner: HOST, names: "Closed", garment: "gown", is_open: false,
+          goal: 100, fee_percent: 8, currency: "usd", closes_at: closes,
+          rate_per_percent: RATE, front_multiplier: FRONT_MUL, ...photos,
+        },
+        /* The brand also owns a garment. Roles freeze at sign-up, but nothing
+           stops a publisher opening a second account. */
+        {
+          id: "L-OWN", owner: DRAWER, names: "Self dealer", garment: "gown", is_open: true,
+          goal: 100, fee_percent: 8, currency: "usd", closes_at: closes,
+          rate_per_percent: RATE, front_multiplier: FRONT_MUL, ...photos,
+        },
+      ],
+      spots: [
+        /* n is 4 rather than 1 on purpose: the next drawn box on this side
+           must be 5, which a "count the rows and add one" would get wrong. */
+        {
+          id: "S-DRAW-1", listing_id: "L-DRAW", side: "front", n: 4, name: "Taken",
+          x: 20, y: 20, w: 20, h: 20, floor: 1600, approved: true, proposed_by: null, closes_at: null,
+        },
+        {
+          id: "S-DRAW-2", listing_id: "L-DRAW", side: "back", n: 1, name: "Taken back",
+          x: 70, y: 70, w: 20, h: 20, floor: 1000, approved: true, proposed_by: null, closes_at: null,
+        },
+      ],
+      bids: [],
+    },
+  });
+
+  let drawDb = null, drawSrv = null;
+
+  before(async () => {
+    drawDb = await startWritableSupabase(seed());
+    drawSrv = await startServer({
+      port: PORT_DRAW,
+      env: {
+        STRIPE_SECRET_KEY: "sk_test_FAKE_neverActuallyCalled",
+        SUPABASE_URL: drawDb.url,
+        SUPABASE_ANON_KEY: "anon-fake",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-fake",
+      },
+    });
+  });
+
+  after(async () => {
+    if (drawSrv) await drawSrv.stop();
+    if (drawDb) await drawDb.stop();
+  });
+
+  const post = async (body, token) => {
+    const { token: c } = await handshake(drawSrv.base);
+    const headers = { cookie: `si_csrf=${c}`, "x-csrf-token": c };
+    if (token) headers.authorization = `Bearer ${token}`;
+    const res = await postJson(drawSrv.base, "/api/bid", body, headers);
+    return { status: res.status, json: await res.json().catch(() => ({})) };
+  };
+
+  const listing = { rate_per_percent: RATE, front_multiplier: FRONT_MUL };
+  const drawn = (over = {}, rest = {}) => Object.assign({
+    listingId: "L-DRAW",
+    draw: Object.assign({ side: "back", x: 0, y: 0, w: 20, h: 20 }, over),
+    max: 1,
+    brand: "Acme",
+  }, rest);
+
+  const spotInserts = () => drawDb.wrote("POST", "spots");
+  const spotDeletes = () => drawDb.wrote("DELETE", "spots");
+
+  /* ------------------------------------------------------- the two shapes */
+  it("a body with no spotId and no draw is still 'Which spot?'", async () => {
+    const r = await post({ listingId: "L-DRAW", max: 1, brand: "Acme" }, tokenAs("brand"));
+    assert.equal(r.status, 400);
+    assert.equal(r.json.error, "Which spot?");
+  });
+
+  it("a draw that is not an object is not a draw", async () => {
+    for (const draw of ["front", 1, true, ["front"], null]) {
+      const r = await post({ listingId: "L-DRAW", draw, max: 1, brand: "Acme" }, tokenAs("brand"));
+      assert.equal(r.status, 400, `draw ${JSON.stringify(draw)} answered ${r.status}`);
+      assert.equal(r.json.error, "Which spot?", `draw ${JSON.stringify(draw)} took the drawn path`);
+    }
+  });
+
+  it("the spotId path still works exactly as it did", async () => {
+    /* Brands may still bid on a spot that already exists - a rectangle
+       another brand drew last week is an ordinary spot. */
+    const before = drawDb.writes.length;
+    const r = await post({ listingId: "L-DRAW", spotId: "S-DRAW-1", max: 1, brand: "Acme" },
+      tokenAs("brand"));
+    assert.equal(r.status, 400);
+    assert.equal(r.json.minimum, 1600, "the floor on the existing spot, untouched by the new pricing");
+    assert.match(r.json.error, /floor/i);
+    assert.equal(drawDb.writes.length, before, "bidding on an existing spot must not write anything");
+  });
+
+  it("a body carrying BOTH a draw and a spotId takes the drawn path", async () => {
+    /* `draw` is the more specific intent. Pinned so a stray spotId left in
+       the body by the page cannot silently buy a different rectangle. */
+    const r = await post(drawn({ w: 2, h: 2 }, { spotId: "S-DRAW-1" }), tokenAs("brand"));
+    assert.equal(r.status, 400);
+    assert.match(r.json.error, /too small/i, "the spotId path answered instead of the drawn one");
+  });
+
+  /* --------------------------------------------------- the listing itself */
+  it("an unknown listing is a 404", async () => {
+    const r = await post(drawn({}, { listingId: "no-such-listing" }), tokenAs("brand"));
+    assert.equal(r.status, 404);
+  });
+
+  it("a closed listing is a 409, and nothing is drawn on it", async () => {
+    const before = spotInserts().length;
+    const r = await post(drawn({}, { listingId: "L-DONE" }), tokenAs("brand"));
+    assert.equal(r.status, 409);
+    assert.match(r.json.error, /closed/i);
+    assert.equal(spotInserts().length, before);
+  });
+
+  it("a listing missing one of its photographs cannot be drawn on", async () => {
+    /* Half a garment photographed is half a garment nobody can draw on, and
+       a brand would be buying a position it has never seen. */
+    const before = spotInserts().length;
+    const r = await post(drawn({}, { listingId: "L-HALF" }), tokenAs("brand"));
+    assert.equal(r.status, 409);
+    assert.match(r.json.error, /photograph/i);
+    assert.equal(spotInserts().length, before);
+  });
+
+  it("you cannot draw on your own garment, whatever your role says", async () => {
+    /* The same shill guard the spotId path has always had. Drawing the spot
+       yourself and then bidding it up is the same trick with an extra step. */
+    const before = spotInserts().length;
+    const r = await post(drawn({}, { listingId: "L-OWN" }), tokenAs("brand"));
+    assert.equal(r.status, 403);
+    assert.match(r.json.error, /your own listing/i);
+    assert.equal(spotInserts().length, before);
+  });
+
+  it("a publisher account cannot draw a spot", async () => {
+    const r = await post(drawn(), tokenAs("host"));
+    assert.equal(r.status, 403);
+    assert.match(r.json.error, /brand account/i);
+  });
+
+  it("without a bearer token it is 401, and nothing is drawn", async () => {
+    const before = spotInserts().length;
+    const r = await post(drawn());
+    assert.equal(r.status, 401);
+    assert.equal(spotInserts().length, before);
+  });
+
+  /* ------------------------------------------------------ the box's rules */
+  it("a box under the minimum area is refused and no spot is created", async () => {
+    const before = spotInserts().length;
+    const r = await post(drawn({ side: "front", x: 0, y: 0, w: 2, h: 2 }), tokenAs("brand"));
+    assert.equal(r.status, 400);
+    assert.match(r.json.error, /too small/i);
+    assert.equal(spotInserts().length, before, "a refused box must never reach the spots table");
+  });
+
+  it("a box over the maximum area is refused and no spot is created", async () => {
+    const before = spotInserts().length;
+    const r = await post(drawn({ side: "front", x: 55, y: 55, w: 40, h: 40 }), tokenAs("brand"));
+    assert.equal(r.status, 400);
+    assert.match(r.json.error, /too big/i);
+    assert.equal(spotInserts().length, before);
+  });
+
+  it("a box hanging off the edge is refused and no spot is created", async () => {
+    for (const box of [
+      { side: "front", x: 95, y: 10, w: 10, h: 10 },      // off the right
+      { side: "front", x: -5, y: 10, w: 10, h: 10 },      // off the left
+      { side: "front", x: 10, y: 95, w: 10, h: 10 },      // off the bottom
+      { side: "front", x: 10, y: -1, w: 10, h: 10 },      // off the top
+    ]) {
+      const before = spotInserts().length;
+      const r = await post(drawn(box), tokenAs("brand"));
+      assert.equal(r.status, 400, `${JSON.stringify(box)} answered ${r.status}`);
+      assert.match(r.json.error, /inside the photograph/i);
+      assert.equal(spotInserts().length, before);
+    }
+  });
+
+  it("a box overlapping a spot already on that side is refused", async () => {
+    /* S-DRAW-1 sits at 20,20 20x20 on the front. Two brands cannot print on
+       the same cloth. */
+    const before = spotInserts().length;
+    const r = await post(drawn({ side: "front", x: 25, y: 25, w: 12, h: 12 }), tokenAs("brand"));
+    assert.equal(r.status, 400);
+    assert.match(r.json.error, /overlaps spot 4/);
+    assert.equal(spotInserts().length, before);
+  });
+
+  it("the same coordinates on the OTHER side are free", async () => {
+    /* The overlap check is per side. The back of a dress is a different
+       piece of cloth, and S-DRAW-2 is nowhere near this. */
+    const r = await post(drawn({ side: "back", x: 25, y: 25, w: 12, h: 12 }), tokenAs("brand"));
+    assert.equal(r.status, 400, "it still fails on the price - but on the price, not on an overlap");
+    assert.match(r.json.error, /floor/i);
+  });
+
+  it("a side that is neither front nor back is refused", async () => {
+    for (const side of ["middle", "FRONT", "", null, 7]) {
+      const r = await post(drawn({ side, x: 0, y: 0, w: 20, h: 20 }), tokenAs("brand"));
+      assert.equal(r.status, 400, `side ${JSON.stringify(side)} answered ${r.status}`);
+      assert.match(r.json.error, /front|back/i, `side ${JSON.stringify(side)} gave "${r.json.error}"`);
+    }
+  });
+
+  it("coordinates that are not numbers are refused", async () => {
+    for (const box of [{ w: "wide" }, { x: "left" }, { h: undefined }, { y: "10%" }]) {
+      const r = await post(drawn(Object.assign({ side: "front", x: 60, y: 60, w: 20, h: 20 }, box)),
+        tokenAs("brand"));
+      assert.equal(r.status, 400, `${JSON.stringify(box)} answered ${r.status}`);
+    }
+  });
+
+  /* ------------------------------------------------------------ the price */
+  it("the floor comes from the area, and it is the engine's number", async () => {
+    /* The README's worked example, travelling over HTTP: a 27% x 10% box on
+       the FRONT is 2.7% of the image, so 2.7 x 250 x 1.6 = 1080. The server
+       answers with the minimum IT computed. */
+    const box = { side: "front", x: 60, y: 60, w: 27, h: 10 };
+    const expected = Market.priceForBox(box, listing);
+    assert.equal(expected, 1080);
+
+    const r = await post(drawn(box), tokenAs("brand"));
+    assert.equal(r.status, 400, "a maximum of 1 cannot clear a floor of 1080");
+    assert.equal(r.json.minimum, expected);
+  });
+
+  it("the same box on the back costs the front multiplier less", async () => {
+    const box = { side: "back", x: 10, y: 10, w: 27, h: 10 };
+    const r = await post(drawn(box), tokenAs("brand"));
+    assert.equal(r.status, 400);
+    assert.equal(r.json.minimum, 675);
+    assert.equal(675 * FRONT_MUL, 1080, "the front is the same cloth at the front's rate");
+  });
+
+  it("a price, floor or area the client invents in the body is ignored", async () => {
+    const box = { side: "front", x: 60, y: 60, w: 27, h: 10 };
+    const r = await post(drawn(box, {
+      floor: 1, price: 1, area: 0.001, areaPercent: 0.001,
+      rate_per_percent: 1, front_multiplier: 0, currency: "jpy", feePercent: 0,
+    }), tokenAs("brand"));
+    assert.equal(r.status, 400);
+    assert.equal(r.json.minimum, 1080, "a client-supplied rate must not move the floor");
+  });
+
+  /* ------------------------------------------- the spot that gets created */
+  it("the spot is created with approved = false, and is cleaned up when the bid fails", async () => {
+    /* Everything this change turns on, in one request.
+
+       The box is valid, so the spot is written. The maximum is 1, which is
+       under the floor the area produces, so the bid is then refused - and the
+       rectangle has no reason to exist. Nobody should have to decline a spot
+       nobody ever bid on, least of all on their own wedding dress. */
+    const box = { side: "front", x: 60, y: 10, w: 20, h: 20 };
+    const expectedFloor = Market.priceForBox(box, listing);      // 4% x 250 x 1.6
+    assert.equal(expectedFloor, 1600);
+
+    const insertsBefore = spotInserts().length;
+    const deletesBefore = spotDeletes().length;
+    const rowsBefore = drawDb.spots().length;
+
+    const r = await post(drawn(box), tokenAs("brand"));
+    assert.equal(r.status, 400);
+    assert.equal(r.json.minimum, expectedFloor);
+
+    const inserts = spotInserts();
+    assert.equal(inserts.length, insertsBefore + 1, "the box was valid, so a spot should have been created");
+    const written = inserts[inserts.length - 1].rows[0];
+
+    assert.equal(written.approved, false,
+      "a brand-drawn spot starts unapproved - it is a request to print on somebody's wedding clothes");
+    assert.equal(written.proposed_by, DRAWER, "the spot has to name the brand that drew it");
+    assert.equal(Number(written.floor), expectedFloor, "the floor must be the engine's, not the client's");
+    assert.equal(written.listing_id, "L-DRAW");
+    assert.equal(written.side, "front");
+    assert.equal(Number(written.x), 60);
+    assert.equal(Number(written.y), 10);
+    assert.equal(Number(written.w), 20);
+    assert.equal(Number(written.h), 20);
+    assert.equal(written.n, 5, "one more than the highest n on that side, which was 4 - not a row count");
+    assert.equal(typeof written.name, "string");
+    assert.ok(written.name.length > 0 && written.name.length <= 40);
+
+    assert.equal(spotDeletes().length, deletesBefore + 1,
+      "the bid failed after the spot was created, so the spot must be deleted again");
+    assert.equal(drawDb.spots().length, rowsBefore,
+      "an orphaned rectangle was left on somebody's dress");
+    assert.ok(!drawDb.spots().some(s => s.proposed_by === DRAWER),
+      "no brand-drawn spot should survive a refused bid");
+  });
+
+  it("numbering is per side, not per listing", async () => {
+    /* The back's highest n is 1, so a box drawn on the back is 2 - even
+       though the front is already up to 4. */
+    const insertsBefore = spotInserts().length;
+    const r = await post(drawn({ side: "back", x: 10, y: 10, w: 20, h: 20 }), tokenAs("brand"));
+    assert.equal(r.status, 400);
+    const inserts = spotInserts();
+    assert.equal(inserts.length, insertsBefore + 1);
+    assert.equal(inserts[inserts.length - 1].rows[0].n, 2);
+  });
+
+  it("every refused box between them left the spots table exactly as it was", async () => {
+    const ids = drawDb.spots().map(s => s.id).sort();
+    assert.deepEqual(ids, ["S-DRAW-1", "S-DRAW-2"],
+      `the drawn path leaked rows: ${JSON.stringify(drawDb.spots().map(s => s.id))}`);
+  });
+
+  it("the drawn path touches nothing but the spots table", async () => {
+    /* Every write it makes goes out on the service-role key, the way bids
+       already do - there is no insert policy for brands on spots, and there
+       must not be one. If a browser could insert a spot it could insert one
+       with a floor of 1 over the best position on the garment. */
+    for (const w of drawDb.writes) {
+      assert.ok(["spots", "bids"].includes(w.table), `an unexpected write to ${w.table}`);
+    }
+  });
+
+  /* ------------------------------------------------------- the rationing */
+  it("drawing is rate limited harder than ordinary bidding", async () => {
+    /* A drawn box is a WRITE: 12 a minute would be 12 permanent rectangles a
+       minute on a stranger's wedding clothes. It is rationed at 4, on its own
+       account-keyed bucket, so this test spends a token nothing else uses.
+
+       The boxes are deliberately too small, so the limiter is what refuses
+       them rather than the market - the counter still moves, because the cost
+       being rationed is the request, not the row. */
+    const seen = [];
+    for (let i = 0; i < 8; i++) {
+      const r = await post(drawn({ side: "front", x: 0, y: 0, w: 2, h: 2 }), LIMIT_TOKEN);
+      seen.push(r.status);
+      if (r.status === 429) break;
+    }
+    assert.ok(seen.includes(429), `a drawn box was never rate limited: ${seen.join(",")}`);
+    assert.equal(seen.indexOf(429), 4, `refused at request ${seen.indexOf(429) + 1}; the limit is 4/min`);
+    assert.ok(seen.indexOf(429) < 12, "drawing must be rationed harder than the 12/min on bidding");
+  });
+
+  it("the 429 says what was refused, in JSON", async () => {
+    const r = await post(drawn({ side: "front", x: 0, y: 0, w: 2, h: 2 }), LIMIT_TOKEN);
+    assert.equal(r.status, 429);
+    assert.match(r.json.error, /spot|draw/i);
+  });
+
+  it("an ordinary bid is NOT charged to the drawn-box budget", async () => {
+    /* The tighter limiter skips a request with no `draw` in it, so a brand
+       that has used up its drawing quota can still bid on spots that already
+       exist. The same token is already at 429 for drawn boxes above. */
+    const r = await post({ listingId: "L-DRAW", spotId: "S-DRAW-1", max: 1, brand: "Acme" }, LIMIT_TOKEN);
+    assert.notEqual(r.status, 429, "the drawn-box limiter swallowed an ordinary bid");
+    assert.equal(r.status, 400);
+    assert.equal(r.json.minimum, 1600);
+  });
+});
+
+/* =========================================================================
+   POST /api/decline/:spotId
+
+   The wearer says no to a rectangle somebody drew on them.
+
+   This route exists because the studio used to answer "decline" with a bare
+   PostgREST DELETE of the spot. `bids.spot_id` is `on delete cascade`, so
+   that delete took every bid on the rectangle with it - and
+   `stripe_payment_intent` lives on the bid row. After that the hold on the
+   sponsor's card could not be cancelled by anybody, ever, because nothing was
+   left that knew its id, while the page said "their card is released".
+
+   So the money is released FIRST, with the secret key, and only then is the
+   row marked. Every test below is about that ordering or about who is allowed
+   to ask.
+   ========================================================================= */
+describe("POST /api/decline/:spotId", () => {
+  const SPONSOR = "66666666-6666-6666-6666-666666666666";
+  const HOST2 = "77777777-7777-7777-7777-777777777777";
+  const STRANGER = "88888888-8888-8888-8888-888888888888";
+
+  let seq = 0;
+  const tokens = {};
+  const tokenAs = who => {
+    const t = `dec-${who}-${++seq}`;
+    tokens[t] = who === "host" ? HOST2 : who === "sponsor" ? SPONSOR : STRANGER;
+    return t;
+  };
+  for (const who of ["host", "sponsor", "stranger"]) for (let i = 0; i < 20; i++) tokenAs(who);
+
+  const photos = {
+    photo_front: "https://example.test/storage/front.jpg",
+    photo_back: "https://example.test/storage/back.jpg",
+  };
+
+  const seed = () => ({
+    tokens,
+    users: {
+      [HOST2]: { id: HOST2, email: "host2@example.test", aud: "authenticated" },
+      [SPONSOR]: { id: SPONSOR, email: "sponsor@example.test", aud: "authenticated" },
+      [STRANGER]: { id: STRANGER, email: "nosy@example.test", aud: "authenticated" },
+    },
+    tables: {
+      profiles: [
+        { id: HOST2, role: "client", display_name: "Dana", brand: null, logo_url: null },
+        { id: SPONSOR, role: "brand", display_name: "Halcyon", brand: "Halcyon", logo_url: null },
+        { id: STRANGER, role: "client", display_name: "Nosy", brand: null, logo_url: null },
+      ],
+      listings: [{
+        id: "L-DEC", owner: HOST2, names: "Dana Halevi", garment: "gown", is_open: true,
+        goal: 5000, fee_percent: 8, currency: "usd",
+        closes_at: new Date(Date.now() + 5 * 86400000).toISOString(),
+        rate_per_percent: 250, front_multiplier: 1.6, ...photos,
+      }],
+      spots: [
+        /* waiting on the wearer, with real money behind it */
+        { id: "S-PENDING", listing_id: "L-DEC", side: "front", n: 1, name: "Brand spot",
+          x: 10, y: 10, w: 12, h: 10, floor: 480, approved: false, declined: false,
+          proposed_by: SPONSOR, closes_at: null },
+        /* already accepted - declining it now would be reneging after the fact */
+        { id: "S-ACCEPTED", listing_id: "L-DEC", side: "back", n: 1, name: "Accepted",
+          x: 40, y: 40, w: 12, h: 10, floor: 300, approved: true, declined: false,
+          proposed_by: SPONSOR, closes_at: null },
+      ],
+      bids: [
+        { id: "B-PENDING", listing_id: "L-DEC", spot_id: "S-PENDING", bidder: SPONSOR,
+          brand: "Halcyon", max_amount: 600, status: "held",
+          stripe_payment_intent: "pi_pending_1", created_at: new Date().toISOString() },
+        { id: "B-RELEASED", listing_id: "L-DEC", spot_id: "S-PENDING", bidder: STRANGER,
+          brand: "Someone else", max_amount: 500, status: "released",
+          stripe_payment_intent: "pi_already_gone", created_at: new Date().toISOString() },
+      ],
+    },
+  });
+
+  let decDb = null, decSrv = null;
+
+  before(async () => {
+    decDb = await startWritableSupabase(seed());
+    decSrv = await startServer({
+      port: PORT_DECLINE,
+      /* Deliberately no STRIPE_SECRET_KEY. With one set, cancelling an
+         authorisation is a real call to Stripe with a fake secret; the route
+         guards on `stripe &&`, so everything these tests are about - who may
+         ask, what order it happens in, and the row surviving - is exercised
+         without anything leaving this machine. */
+      env: {
+        SUPABASE_URL: decDb.url,
+        SUPABASE_ANON_KEY: "anon-fake",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-fake",
+      },
+    });
+  });
+
+  after(async () => {
+    if (decSrv) await decSrv.stop();
+    if (decDb) await decDb.stop();
+  });
+
+  const decline = async (spotId, token) => {
+    const { token: c } = await handshake(decSrv.base);
+    const headers = { cookie: `si_csrf=${c}`, "x-csrf-token": c };
+    if (token) headers.authorization = `Bearer ${token}`;
+    const res = await postJson(decSrv.base, `/api/decline/${spotId}`, {}, headers);
+    return { status: res.status, json: await res.json().catch(() => ({})) };
+  };
+
+  it("a stranger cannot decline a rectangle on somebody else's garment", async () => {
+    const r = await decline("S-PENDING", tokenAs("stranger"));
+    assert.equal(r.status, 403, JSON.stringify(r.json));
+    assert.match(r.json.error, /not your garment/i);
+  });
+
+  it("neither can the sponsor who drew it", async () => {
+    /* Withdrawing your own bid is a different feature with different
+       accounting. This route is the wearer's refusal, and nobody else's. */
+    const r = await decline("S-PENDING", tokenAs("sponsor"));
+    assert.equal(r.status, 403, JSON.stringify(r.json));
+  });
+
+  it("signing in is required at all", async () => {
+    const r = await decline("S-PENDING", null);
+    assert.equal(r.status, 401);
+  });
+
+  it("a spot that does not exist is a 404, not a 500", async () => {
+    const r = await decline("S-NOPE", tokenAs("host"));
+    assert.equal(r.status, 404);
+  });
+
+  it("an accepted spot cannot be declined out from under the sponsor", async () => {
+    const r = await decline("S-ACCEPTED", tokenAs("host"));
+    assert.equal(r.status, 409, JSON.stringify(r.json));
+    assert.match(r.json.error, /already accepted/i);
+  });
+
+  it("the wearer's refusal releases the held card and marks the row, and never deletes it", async () => {
+    const r = await decline("S-PENDING", tokenAs("host"));
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+    assert.equal(r.json.released, 1, "the one held authorisation should have been released");
+    assert.deepEqual(r.json.brands, ["Halcyon"]);
+
+    /* The row survives. This is the whole point: delete it and the bid row
+       cascades, taking the payment intent with it. */
+    assert.equal(decDb.wrote("DELETE", "spots").length, 0,
+      "declining deleted the spot, which cascades to the bids and strands the hold");
+
+    const spot = decDb.tables.spots.find(r => r.id === "S-PENDING");
+    assert.equal(spot.declined, true, "the spot was never marked declined");
+    assert.ok(spot.declined_at, "nothing recorded when it was declined");
+    assert.equal(spot.approved, false, "declining must not quietly approve it");
+
+    const bid = decDb.tables.bids.find(r => r.id === "B-PENDING");
+    assert.equal(bid.status, "released");
+    assert.ok(bid.released_at, "the released bid has no timestamp");
+
+    /* The one that was already released is left alone - re-cancelling a dead
+       intent is an error from Stripe, not a no-op. */
+    const old = decDb.tables.bids.find(r => r.id === "B-RELEASED");
+    assert.equal(old.status, "released");
+  });
+
+  it("declining twice is harmless", async () => {
+    const r = await decline("S-PENDING", tokenAs("host"));
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+    assert.equal(r.json.alreadyDeclined, true);
+    assert.equal(r.json.released, 0, "there was nothing left to release the second time");
   });
 });

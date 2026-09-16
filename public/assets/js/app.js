@@ -17,6 +17,14 @@
 const $  = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+/* --------------------------------------------------- the two sides, spoken
+   The stored role values are "client" and "brand", frozen on first choice by
+   a database trigger, so they cannot be renamed. Every word the reader sees
+   for a role comes from here instead - which is the only thing that stops the
+   display drifting from the value underneath it. */
+const SIDE = { client: "wearer", brand: "sponsor" };
+const Side = role => SIDE[role].charAt(0).toUpperCase() + SIDE[role].slice(1);
+
 /* ------------------------------------------------------------------ state */
 const state = {
   screen: "home",
@@ -26,7 +34,7 @@ const state = {
   side: "front",
   studioSide: "front",
   selected: null,
-  drawing: false,
+  arming: false,
   unsubscribe: null,
   /* the directory: every open listing, and which facet is being shown */
   directory: [],
@@ -48,15 +56,59 @@ function money(n, opts = {}) {
 const num = n => new Intl.NumberFormat().format(Math.round(Number(n) || 0));
 const plural = (n, one, many) => `${n} ${n === 1 ? one : (many || one + "s")}`;
 
+/* The fee is the platform's, not the publisher's, so it is read from the
+   config the server sends and never from the listing row. */
+const feePercent = () => Number(Store.config.feePercent) || 0;
+/* "A 8% fee" reads as a typo. The article follows how the number is SAID, so
+   it is the leading digits that decide it: eight, eighteen, eleven. */
+const article = n => (/^(8|11|18)/.test(String(n)) ? "An" : "A");
+
+/* ---------------------------------------------------------- local clocks
+   An <input type="datetime-local"> holds LOCAL wall-clock time, by
+   definition. Filling one from `toISOString()` puts a UTC wall clock in it,
+   which the browser then reads back as local - so Save moved the close by
+   the browser's offset, and because the shifted value was written back and
+   filled in again on the next render, every Save moved it again. Two saves
+   from London in summer is two hours; from Sydney it is twenty.
+
+   The fix is here and only here. The save path does `new Date(value)`, which
+   is correct the moment the field genuinely holds local time; correcting
+   both sides would cancel out and put the drift straight back. */
+const MIN_LEAD_MS = 3600000;                 // an hour, so a last bid can be answered
+
+function localInputValue(when) {
+  const d = when == null ? null : new Date(when);
+  if (!d || Number.isNaN(d.getTime())) return "";
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+/* Whose clock the field is keeping. The input never says, and a publisher
+   setting the moment their campaign ends should not have to guess. */
+function localZoneName() {
+  try {
+    const z = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (z) return z;
+  } catch { /* fall through to the offset */ }
+  const off = -new Date().getTimezoneOffset();
+  const sign = off < 0 ? "-" : "+";
+  const abs = Math.abs(off);
+  return `UTC${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
+}
+
 /* Everything that reaches innerHTML goes through this. User-supplied brand
    names and blurbs are rendered all over the page; none of them are trusted. */
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
-/* A URL that is safe to put in src=. Blocks javascript: and data: text. */
+/* A URL that is safe to put in src=. Blocks javascript: and data: text.
+
+   Root-relative paths under /assets/ are allowed so a listing can point at a
+   photograph we ship ourselves. It must be a single leading slash: `//evil.com`
+   is protocol-relative and would load off another origin entirely. */
 function safeUrl(u) {
   const s = String(u || "").trim();
+  if (/^\/assets\/[A-Za-z0-9._\-/]+$/.test(s) && !s.includes("..")) return s;
   if (/^(https?:|blob:)/i.test(s)) return s;
   if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);/i.test(s)) return s;
   return "";
@@ -73,6 +125,62 @@ function toast(text, kind = "") {
     el.style.opacity = "0"; el.style.transform = "translateY(8px)";
     setTimeout(() => el.remove(), 320);
   }, 4200);
+}
+
+/* ------------------------------------------------------------- refusing a field
+   Every form on this page used to refuse the same way: write a sentence into
+   an `.err` block and stop. Nothing marked the field, nothing moved to it,
+   and a screen reader was never told the block had appeared - so on a form
+   as long as the publisher's terms the refusal could be a screen and a half
+   above whatever the person was looking at, and the only clue that Save had
+   done nothing was that nothing happened.
+
+   One helper, used by all of them. The message, the red border, the scroll
+   and the focus travel together, and the whole lot clears on the next
+   keystroke, because a field still marked wrong while it is being fixed is
+   telling somebody about a mistake they have already corrected.
+
+   Returns false so a caller can write `return fail(el, "…")` in one line. */
+function fail(el, msg, box) {
+  /* Unhide before writing: a role="alert" region that is revealed and filled
+     in the same breath is announced, one that is filled while hidden is not. */
+  if (box) { box.hidden = false; box.textContent = msg; }
+
+  if (!el) return false;
+
+  const host = el.closest(".fld") || el.parentElement;
+  let note = null;
+  if (!box && host) {
+    note = $(".fld-err", host);
+    if (!note) {
+      note = document.createElement("p");
+      note.className = "fld-err";
+      note.id = (el.id || "fld") + "-err";
+      host.append(note);
+    }
+    note.textContent = msg;
+    /* Described by, not merely near: focus is about to land on the field, and
+       this is what makes the reason audible when it does. */
+    const d = (el.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+    if (!d.includes(note.id)) el.setAttribute("aria-describedby", d.concat(note.id).join(" "));
+  }
+
+  el.setAttribute("aria-invalid", "true");
+  el.scrollIntoView({ block: "center" });
+  el.focus();
+
+  el.addEventListener("input", function cleared() {
+    el.removeAttribute("aria-invalid");
+    if (box) box.hidden = true;
+    if (note) {
+      const d = (el.getAttribute("aria-describedby") || "").split(/\s+/).filter(x => x && x !== note.id);
+      if (d.length) el.setAttribute("aria-describedby", d.join(" "));
+      else el.removeAttribute("aria-describedby");
+      note.remove();
+    }
+  }, { once: true });
+
+  return false;
 }
 
 /* ------------------------------------------------------------------ sheet */
@@ -225,12 +333,15 @@ function garmentPanel(side, opts = {}) {
     spots: allSpots = state.spots,
     bids: allBids = state.bids,
     interactive = true,
-    editing = false,
+    showPending = false,
   } = opts;
   if (!L) return "";
   const photo = safeUrl(L["photo_" + side]);
   const bySpot = Store.bids.bySpot(allBids);
-  const spots = allSpots.filter(s => s.side === side);
+  /* A spot the publisher has not accepted is not on the garment. The studio
+     passes showPending so the owner can see what is waiting on them. */
+  const spots = allSpots.filter(s =>
+    !s.declined && s.side === side && (showPending || s.approved !== false));
 
   const art = photo
     ? `<img src="${esc(photo)}" alt="The ${esc(garmentWord(L))}, ${esc(side)}" loading="lazy" decoding="async">`
@@ -258,14 +369,23 @@ function garmentPanel(side, opts = {}) {
   }).join("");
 
   return `<div>
-    <div class="garment${editing ? " editing" : ""}" data-side="${side}">
+    <div class="garment${photo ? " photo" : ""}" data-side="${side}">
       ${art}<span class="side-tag">${side}</span>${marks}
     </div>
   </div>`;
 }
 
-function renderGarment() {
+function renderGarment(force = false) {
   const wrap = $("#garment-wrap");
+  /* A rectangle on the cloth - one being dragged, or one that was refused and
+     is still carrying its reason - stops a BACKGROUND redraw. The listing is
+     re-read every four seconds, and that redraw detached the pane out from
+     under a finger mid-drag and deleted a refusal a second after it appeared,
+     which is most of why a refused drag seemed to vanish on its own. Nothing
+     has to be remembered to know this: the draft is in the DOM. Anything the
+     reader asked for - the side toggle, the draw toggle, a resize - passes
+     force and redraws regardless. */
+  if (!force && $(".spot-draft", wrap)) return;
   /* Wide enough for both panels side by side, and then the front/back toggle
      has nothing left to toggle, so it goes away. */
   const both = window.matchMedia("(min-width:680px)").matches;
@@ -277,6 +397,24 @@ function renderGarment() {
 
   $$("#garment-wrap .spot").forEach(b =>
     b.addEventListener("click", () => selectSpot(b.dataset.spot, true)));
+
+  /* Every panel on screen is drawable. The refusal is checked on release
+     rather than here, so somebody who is not signed in still gets the drag
+     and then a reason, instead of a photograph that quietly ignores them. */
+  /* Drawing is armed, not always on. See the note on .drawable in the CSS:
+     a permanently drawable panel cannot be scrolled past on a phone. */
+  $$("#garment-wrap .garment").forEach(pane => {
+    if (!state.arming) return;
+    pane.classList.add("drawable");
+    /* Arming is NOT dropped here. It used to be, before `claimBox` had even
+       looked at the box, so a refused drag also switched drawing off and the
+       brand had to hunt for the toggle again to try the thing it had just
+       been told to do differently. `claimBox` disarms itself at the one
+       moment it is right to: when the bid sheet actually opens. Whatever it
+       returns is the reason it would not, and goes back to the drag. */
+    wireDrawing(pane, box => claimBox(box));
+  });
+  syncDrawToggle();
 }
 
 /* =========================================================================
@@ -288,11 +426,16 @@ function garmentLabel(L) {
   return `${wornBy(L) === "male" ? "Men's" : "Women's"} ${garmentWord(L)}`;
 }
 
+/* What the public page is allowed to see. A spot the publisher has not yet
+   accepted holds a brand's money but has no place on the garment, in the
+   spot list, in the goal, or in the count of what is still open. */
+const approvedSpots = () => state.spots.filter(s => s.approved !== false && !s.declined);
+
 function renderCampaign() {
   const L = state.listing;
   if (!L) return;
   const bySpot = Store.bids.bySpot(state.bids);
-  const c = Store.campaign(state.spots, bySpot, L.goal);
+  const c = Store.campaign(approvedSpots(), bySpot, L.goal);
 
   /* hero ------------------------------------------------------------- */
   $("#hero-kicker").textContent = L.is_open
@@ -300,12 +443,12 @@ function renderCampaign() {
     : "Bidding has not opened yet";
   $("#hero-h1").innerHTML = L.headline
     ? esc(L.headline)
-    : `Walking billboard <em>for your brand</em>`;
+    : `Walking billboard <em>for your mark</em>`;
   $("#hero-lead").textContent = L.tagline ||
     `Your logo on ${L.names || "the garment"}, worn all day, in every photograph taken.`;
 
   $("#hero-avatar").textContent = (L.names || "?").trim()[0] || "?";
-  $("#hero-who").textContent = L.names || "The publisher";
+  $("#hero-who").textContent = L.names || "The wearer";
   $("#hero-where").textContent =
     [garmentLabel(L), L.city, L.event_date].filter(Boolean).join(" · ");
 
@@ -314,17 +457,21 @@ function renderCampaign() {
   $("#goal-target").textContent = money(c.goal);
   $("#goal-open").textContent = c.open;
   $("#goal-total").textContent = c.total;
+  $("#goal-total-word").textContent = c.total === 1 ? "sponsor on board" : "sponsors on board";
   requestAnimationFrame(() => { $("#goal-bar").style.width = (c.pct * 100).toFixed(1) + "%"; });
   $("#goal-refund").textContent = c.met
     ? "Goal reached — this is going ahead"
-    : "Refunded in full if the goal is not reached";
+    : "Every hold is released if the goal is not reached";
+  $("#perks-h2").textContent = L.names
+    ? `What ${L.names} are offering`
+    : "What the wearer is offering";
   $("#garment-pill").innerHTML = L.is_open
     ? `<span class="beat"></span> Live`
     : `Not open`;
 
   renderGarment();
   renderSpotList(bySpot);
-  renderFeature(bySpot);
+  renderFeature();
   renderWall(bySpot);
   renderEventCard(c);
   renderAbout();
@@ -336,7 +483,7 @@ function renderCampaign() {
 function renderSpotList(bySpot) {
   const sides = ["front", "back"];
   const html = sides.map(side => {
-    const rows = state.spots.filter(s => s.side === side);
+    const rows = approvedSpots().filter(s => s.side === side);
     if (!rows.length) return "";
     return `<div class="side-hd"><p class="lbl">${side} of the ${esc(garmentWord(state.listing))}</p>
               <span class="pill">${rows.length} spot${rows.length === 1 ? "" : "s"}</span></div>` +
@@ -353,49 +500,80 @@ function renderSpotList(bySpot) {
             <span class="s">${st.holder ? "to take it" : "floor"}</span>
           </span>
           <span class="blurb">${esc(s.blurb || "")}</span>
-          ${st.holder ? `<span class="who">Held by ${esc(st.holderName || "a brand")} at ${money(st.price)}</span>` : ""}
+          ${st.holder ? `<span class="who">Held by ${esc(st.holderName || `a ${SIDE.brand}`)} at ${money(st.price)}</span>` : ""}
         </button>`;
       }).join("");
   }).join("");
 
   $("#spotlist").innerHTML = html ||
-    `<div class="empty-state"><h3>No spots marked out yet</h3>
-     <p>The publisher has not laid any out on the garment.</p></div>`;
+    `<div class="empty-state"><h3>Nothing claimed yet</h3>
+     <p>Every inch of this one is still going. Drag a box out on the garment above and it is yours.</p></div>`;
   $$("#spotlist .srow").forEach(b =>
     b.addEventListener("click", () => openBid(b.dataset.spot)));
 }
 
-/* the one spot the page argues for */
-function renderFeature(bySpot) {
-  const s = state.spots.find(x => x.badge === "MEGA")
-        || state.spots.slice().sort((a, b) => b.floor - a.floor)[0];
-  if (!s) { $("#feature-wrap").hidden = true; return; }
+/* =========================================================================
+   the rate card
+
+   The page used to argue for one standout rectangle, because the publisher had
+   drawn a menu and one item on it was the expensive one. There is no menu now.
+   What a brand needs instead is the arithmetic - the rate, the premium on the
+   front, and three worked examples at sizes they can picture.
+   ========================================================================= */
+function renderFeature() {
+  const L = state.listing;
+  if (!L) { $("#feature-wrap").hidden = true; return; }
   $("#feature-wrap").hidden = false;
-  const st = Store.market(s, bySpot[s.id]);
-  const min = Store.minimum(s, bySpot[s.id]);
+
+  const examples = [
+    { label: "A small mark", side: "back", w: 11, h: 8,
+      note: "About the size of a pocket badge." },
+    { label: "Across the chest", side: "front", w: 20, h: 9,
+      note: "The one that lands in every photograph taken head-on." },
+    { label: "The whole back panel", side: "back", w: 26, h: 16,
+      note: "The largest clean area on most garments, and the cheapest by the inch." },
+  ];
+
+  const rows = examples.map(e => `<tr>
+    <td data-k="Size"><b>${esc(e.label)}</b><br><span class="hint">${esc(e.note)}</span></td>
+    <td data-k="Where">${esc(e.side)}</td>
+    <td data-k="Area" class="num">${areaOf(e).toFixed(1)}%</td>
+    <td data-k="Costs" class="num" style="text-align:end"><b>${money(boxPrice(e, L))}</b></td>
+  </tr>`).join("");
 
   $("#feature").innerHTML = `
-    <p class="lbl">Only one exists</p>
-    <h2 style="margin-top:10px">${esc(s.name)} — <em>${money(st.holder ? min : st.price)}</em></h2>
-    <p class="lead" style="margin-top:14px">${esc(s.blurb || "")}</p>
-    <ul>
-      <li>A dedicated piece of content for your brand alone</li>
-      <li>The largest single area on the ${esc(s.side)} of the ${esc(garmentWord(state.listing))}</li>
-      <li>Guaranteed thumbnail placement in the recap video</li>
-      <li>${st.holder ? `Currently held by ${esc(st.holderName || "a brand")} at ${money(st.price)} — it is still takeable`
-                      : `Position ${+s.n} on the ${esc(s.side)}. Nobody has it yet.`}</li>
-    </ul>
-    <div style="display:flex;gap:11px;flex-wrap:wrap;margin-top:24px">
-      <button class="btn" data-spot="${esc(s.id)}" id="feature-go">${st.holder ? "Take this spot" : "Claim this spot"}</button>
-      <button class="btn ghost" id="feature-share">Share it</button>
+    <p class="lbl">What it costs</p>
+    <h2 style="margin-top:10px">${money(rateOf(L))} for <em>one percent</em> of the ${esc(garmentWord(L))}</h2>
+    <p class="lead" style="margin-top:14px">
+      You draw the rectangle; its area sets the price. Anything on the front carries a
+      ×${frontMultiplierOf(L)} premium, because that is the side the cameras are pointed at.
+      ${/* "Nothing else is added" was not survivable: against a real database the
+            bid sheet cannot show a single fee figure, so the one place the fee
+            was promised to appear was the one place it did not. Say the number
+            here instead, read from the config the server sends. */""}
+      ${article(feePercent())} ${esc(String(feePercent()))}% platform fee is added at checkout.
+    </p>
+    <div class="tbl-scroll" style="margin-top:26px">
+      <table class="tbl">
+        <thead><tr><th>Size</th><th>Where</th><th>Area</th><th style="text-align:end">Costs</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:11px;flex-wrap:wrap;margin-top:26px">
+      <button class="btn" id="feature-go">Draw your own</button>
+      <button class="btn ghost" id="feature-share">Share this</button>
     </div>`;
-  $("#feature-go").addEventListener("click", () => openBid(s.id));
-  $("#feature-share").addEventListener("click", () => openShare(s));
+
+  $("#feature-go").addEventListener("click", () => {
+    setArming(true);
+    if (state.arming) $("#garment-wrap").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+  $("#feature-share").addEventListener("click", () => openShare(null));
 }
 
 /* wall of marks */
 function renderWall(bySpot) {
-  const held = state.spots
+  const held = approvedSpots()
     .map(s => ({ s, st: Store.market(s, bySpot[s.id]) }))
     .filter(x => x.st.holder);
 
@@ -406,7 +584,7 @@ function renderWall(bySpot) {
       : `<b>${esc(st.holderName || "Sponsor")}</b>`}</div>`;
   });
 
-  const blanks = Math.max(0, Math.min(6, state.spots.length - held.length));
+  const blanks = Math.max(0, Math.min(6, approvedSpots().length - held.length));
   for (let i = 0; i < blanks; i++) slots.push(`<div class="slot blank">Open</div>`);
 
   $("#wall").innerHTML = slots.length ? slots.join("")
@@ -425,16 +603,17 @@ function renderEventCard(c) {
     ["In the room", num(L.confirmed || 0), "confirmed guests"],
     ["Impressions", num(a.total), "conservatively"],
     ["Cost per thousand", money(cpm, { cents: true }), "at today's prices"],
-    ["Spots open", `${c.open}/${c.total}`, "still unclaimed"],
+    /* Not "N of M spots open". A spot only exists here because a brand drew
+       it and bid on it, so `c.open` is structurally zero and the figure read
+       "0/3 still unclaimed" on a garment with plenty of bare cloth left. */
+    ["Sponsors on board", num(c.total), c.total ? "room for more" : "nothing drawn yet"],
   ];
 
   $("#event-card").innerHTML = `
     <p class="lbl">The day</p>
     <h2 style="margin-top:10px">${esc(L.venue || "The day itself")}${L.city ? ` · ${esc(L.city)}` : ""}</h2>
     <p class="lead" style="margin-top:14px">
-      ${esc(String(L.confirmed || 0))} confirmed of ${esc(String(L.invited || 0))} invited${L.venue_type ? `, ${esc(L.venue_type)}` : ""}.
-      ${L.shooters ? `Shot by ${esc(L.shooters)}. ` : ""}${L.livestream ? "It is being livestreamed. " : ""}
-      ${L.press ? esc(L.press) + "." : ""}
+      ${esc(String(L.confirmed || 0))} confirmed of ${esc(String(L.invited || 0))} invited.${L.livestream ? " It is being livestreamed." : ""}
     </p>
     <div class="stats" style="margin-top:26px;margin-bottom:0">
       ${figures.map(([k, v, d]) =>
@@ -442,7 +621,6 @@ function renderEventCard(c) {
     </div>
     <div class="chips" style="margin-top:22px">
       <button class="btn ghost sm" id="event-workings">How that is worked out</button>
-      ${L.hashtag ? `<span class="hint">Everything goes out under <b>${esc(L.hashtag)}</b>.</span>` : ""}
     </div>`;
 
   $("#event-workings").addEventListener("click", () => openSheet({
@@ -460,7 +638,7 @@ function renderEventCard(c) {
           <span class="v">${money(cpm, { cents: true })}</span></div>
       </div>
       <p class="hint" style="margin-top:16px">Every multiplier above is deliberately pessimistic. We would
-        rather a brand be pleasantly surprised than sold a number we cannot stand behind.</p>`,
+        rather a sponsor be pleasantly surprised than sold a number we cannot stand behind.</p>`,
   }));
 }
 
@@ -477,7 +655,7 @@ function renderAbout() {
     <div class="avatar lg">${esc((L.names || "?").trim()[0] || "?")}</div>
     <div style="flex:1 1 320px">
       <p class="lbl">About</p>
-      <h2 style="margin-top:8px">${esc(L.names || "The publisher")}</h2>
+      <h2 style="margin-top:8px">${esc(L.names || "The wearer")}</h2>
       <p class="lead" style="margin-top:14px">${esc(L.about || "")}</p>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px">
         <button class="btn ghost sm" id="about-chat">Ask a question</button>
@@ -501,7 +679,7 @@ function openChat() {
     kicker: "Questions",
     /* not esc()'d: openSheet assigns the title with textContent, so escaping
        here would show a literal &amp; to the reader */
-    title: `Ask ${L.names || "the publisher"}`,
+    title: `Ask ${L.names || "the wearer"}`,
     body: `
       <div id="chat-log" style="max-height:44vh;overflow-y:auto;display:grid;gap:10px;
                                 padding:4px 2px;overscroll-behavior:contain"></div>
@@ -521,7 +699,7 @@ function openChat() {
         log.innerHTML = rows.length ? rows.map(m => {
           const meName = user && (m.author === user.id || m.who === (user.brand || user.name));
           return `<div class="bubble${meName ? " me" : ""}">
-            <div class="lbl">${esc(m.display_name || m.who || "someone")}${m.role === "client" ? " · publisher" : ""}</div>
+            <div class="lbl">${esc(m.display_name || m.who || "someone")}${m.role === "client" ? ` · ${SIDE.client}` : ""}</div>
             <div class="msg">${esc(m.body || m.text || "")}</div>
           </div>`;
         }).join("") : `<p class="hint" style="text-align:center;padding:20px">No questions yet. Ask the first one.</p>`;
@@ -591,10 +769,10 @@ function openShare(spot) {
   const L = state.listing;
   const url = shareUrl(spot);
   const text = !L
-    ? "Square Inch — publishers sell numbered advertising spots on a gown or a suit, and brands bid on them."
+    ? "Square Inch — somebody spends the day being photographed, and you buy a patch of what they are wearing."
     : spot
       ? `Spot ${String(+spot.n).padStart(2, "0")} — ${spot.name} — on ${L.names}'s ${garmentWord(L)}. Bidding is open.`
-      : `${L.names} are selling advertising space on the ${garmentWord(L)}. Numbered spots, open bidding.`;
+      : `${L.names} are selling advertising space on the ${garmentWord(L)} — draw the patch you want and bid on it.`;
 
   const x = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
 
@@ -634,7 +812,7 @@ function openShare(spot) {
    ========================================================================= */
 function selectSpot(id, scroll) {
   state.selected = id;
-  renderGarment();
+  renderGarment(true);
   const spot = state.spots.find(s => s.id === id);
   if (!spot) return;
   const bySpot = Store.bids.bySpot(state.bids);
@@ -648,10 +826,33 @@ function selectSpot(id, scroll) {
 
 $("#ab-go").addEventListener("click", () => state.selected && openBid(state.selected));
 
-function openBid(spotId) {
-  const spot = state.spots.find(s => s.id === spotId);
-  if (!spot) return;
+/* A drawn box has no row in the database yet: the server creates it as part
+   of taking the bid, so until then it is a spot-shaped object carrying a
+   price and no id. Everything downstream treats it like any other spot. */
+function draftSpot(box, L) {
+  return {
+    /* Not null: market.js refuses a spot whose id is nullish, which is the
+       right guard for a spot that was never created and exactly the wrong
+       answer for one that is about to be. The id is a sentinel - the engine
+       only ever tests it for existence, and the row the server writes gets a
+       real one. */
+    id: "drawn", listing_id: L.id, side: box.side,
+    n: state.spots.filter(s => s.side === box.side).length + 1,
+    name: "The area you drew", badge: null,
+    blurb: `${areaOf(box).toFixed(1)}% of the ${garmentWord(L)}, on the ${box.side}. ` +
+           `Priced at ${money(rateOf(L))} per 1%${box.side === "front"
+             ? `, and the front carries a ×${frontMultiplierOf(L)} premium` : ""}.`,
+    x: box.x, y: box.y, w: box.w, h: box.h,
+    floor: boxPrice(box, L),
+    approved: false,
+  };
+}
+
+function openBid(spotId, box) {
   const L = state.listing;
+  if (!L) return;
+  const spot = box ? draftSpot(box, L) : state.spots.find(s => s.id === spotId);
+  if (!spot) return;
   const user = Store.auth.current();
   const bySpot = Store.bids.bySpot(state.bids);
   const mine = bySpot[spot.id] || [];
@@ -664,21 +865,23 @@ function openBid(spotId) {
   if (!L.is_open) { toast("Bidding has not opened on this listing yet."); return; }
   if (!user) {
     toast("Open an account to bid.");
-    go("auth", { role: "brand", next: () => openBid(spotId) });
+    go("auth", { role: "brand", next: () => openBid(spotId, box) });
     return;
   }
-  if (user.role !== "brand") { toast("You are signed in as a publisher. Bidding is for brands."); return; }
+  if (user.role !== "brand") { toast(`You are signed in as a ${SIDE.client}. Bidding is for ${SIDE.brand}s.`); return; }
 
   openSheet({
-    kicker: `${spot.side} · position ${String(+spot.n).padStart(2, "0")}`,
+    kicker: box ? `${spot.side} · a new area` : `${spot.side} · position ${String(+spot.n).padStart(2, "0")}`,
     title: spot.name,
     body: `
       <p class="lead" style="font-size:.92rem">${esc(spot.blurb || "")}</p>
 
       <div class="quote" style="margin-top:18px">
-        <div class="ln"><span class="k">${st.holder ? "Standing price" : "Floor"}</span>
+        ${box ? `<div class="ln"><span class="k">Area you drew</span>
+          <span class="v">${areaOf(box).toFixed(1)}%</span></div>` : ""}
+        <div class="ln"><span class="k">${box ? "What that area costs" : st.holder ? "Standing price" : "Floor"}</span>
           <span class="v">${money(st.price)}</span></div>
-        ${st.holder ? `<div class="ln"><span class="k">Held by</span><span class="v">${esc(st.holderName || "a brand")}</span></div>` : ""}
+        ${st.holder ? `<div class="ln"><span class="k">Held by</span><span class="v">${esc(st.holderName || `a ${SIDE.brand}`)}</span></div>` : ""}
         <div class="ln"><span class="k">Least you can bid</span><span class="v">${money(min)}</span></div>
         <div class="ln"><span class="k">Closes</span><span class="v">${esc(Market.countdown(L.closes_at))}</span></div>
       </div>
@@ -705,11 +908,18 @@ function openBid(spotId) {
         </div>
 
         <div class="quote" id="bid-quote"></div>
-        <p class="err" id="bid-err" hidden></p>
+        <p class="err" id="bid-err" role="alert" hidden></p>
         <button class="btn wide" type="submit" id="bid-go" style="margin-top:16px">
           <span>${st.holder ? "Take the spot" : "Claim the spot"}</span></button>
+        ${/* A drawn box is a proposal to print on a stranger's body, and they
+              can say no. Until now the only place that was said was the toast
+              AFTER the card had been authorised. An existing spot is already
+              accepted, so it keeps the Stripe line. */""}
         <p class="hint" style="text-align:center;margin-top:12px">
-          Card handled by Stripe on its own page. Outbid before close and the hold is released in full.</p>
+          ${box
+            ? `${esc(L.names || "The wearer")} has to accept this patch before it is printed.
+               If they decline, your card is released in full and you are told why.`
+            : "Card handled by Stripe on its own page. Outbid before close and the hold is released in full."}</p>
       </form>`,
 
     onOpen(root) {
@@ -738,16 +948,42 @@ function openBid(spotId) {
         /* Against a real database the leader's ceiling is sealed, so the
            truthful answer is a range rather than a figure. Pretending to know
            exactly would be the same lie in a different place. */
-        const settlesLine = v.blind
-          ? `<div class="ln"><span class="k">Settles between</span><span class="v">${money(owed.placement, { cents: true })} – ${money(v.max, { cents: true })}</span></div>
-             <div class="ln"><span class="k">Where it lands depends on the current holder's maximum, which is sealed. You are told the moment your bid is in.</span></div>`
-          : `<div class="ln"><span class="k">Settles at today</span><span class="v">${money(owed.placement, { cents: true })}</span></div>
-             <div class="ln"><span class="k">Platform fee, ${fee}%</span><span class="v">${money(owed.fee, { cents: true })}</span></div>
-             <div class="ln"><span class="k">Owed if it closed now</span><span class="v">${money(owed.total, { cents: true })}</span></div>`;
+        /* When this bid does NOT take the spot, `v.price` is what the CURRENT
+           HOLDER will pay - it is their price being pushed up, not yours.
+           Labelling it "owed if it closed now" printed a number the bidder does
+           not owe, and on a held spot at the minimum it printed one LARGER than
+           the hold directly beneath it. A losing bid owes nothing. */
+        /* One fee row, built before the branch and rendered in every one of
+           them. It used to be written only inside the non-blind branch - and
+           `blind` is true whenever there is a real database behind the page,
+           so the platform fee was invisible in precisely the mode where a
+           card is actually charged. Where the settlement is sealed the honest
+           figure is a range: the fee on the least it can settle at, through
+           the fee on the most this bidder has authorised. A bid that does not
+           take the spot owes nothing, so its fee is nothing. */
+        const feeLine = `<div class="ln"><span class="k">Platform fee, ${fee}%</span><span class="v">${
+          v.blind ? `${money(owed.fee, { cents: true })} – ${money(held.fee, { cents: true })}`
+            : v.won ? money(owed.fee, { cents: true })
+              : money(0, { cents: true })}</span></div>`;
+
+        const settlesLine = !v.won && !v.blind
+          ? `<div class="ln"><span class="k">Owed if it closed now</span><span class="v">${money(0, { cents: true })}</span></div>`
+            + feeLine +
+            `<div class="ln"><span class="k">This does not take the spot, so nothing is owed. The authorisation below is released at the close.</span></div>`
+          : v.blind
+          ? `<div class="ln"><span class="k">Settles between</span><span class="v">${money(owed.placement, { cents: true })} – ${money(v.max, { cents: true })}</span></div>`
+            + feeLine +
+            `<div class="ln"><span class="k">Where it lands depends on the current holder's maximum, which is sealed. You are told the moment your bid is in.</span></div>`
+          : `<div class="ln"><span class="k">Settles at today</span><span class="v">${money(owed.placement, { cents: true })}</span></div>`
+            + feeLine +
+            `<div class="ln"><span class="k">Owed if it closed now</span><span class="v">${money(owed.total, { cents: true })}</span></div>`;
 
         quoteEl.innerHTML = settlesLine + `
           <div class="ln tot"><span class="k">Held on your card</span><span class="v">${money(held.total, { cents: true })}</span></div>
-          ${gap > 0.005 && !v.blind
+          ${/* The explainer was suppressed in blind mode too, which left the
+                largest figure on the sheet - the whole authorisation - with
+                nothing saying most of it is a hold rather than a charge. */""}
+          ${gap > 0.005
             ? `<div class="ln"><span class="k">${money(gap, { cents: true })} of that is only a hold — released at close unless a rival pushes you up to it.</span></div>`
             : ""}
           ${v.blind ? "" : (v.won
@@ -771,22 +1007,32 @@ function openBid(spotId) {
       $("#bid-form", root).addEventListener("submit", async ev => {
         ev.preventDefault();
         errEl.hidden = true;
-        const brand = $("#bid-brand", root).value.trim();
+        const brandEl = $("#bid-brand", root);
+        const brand = brandEl.value.trim();
         const max = Number(maxEl.value);
         const v = Store.quote(spot, mine, { bidder: user.id, brand, max });
-        if (!v.ok) { errEl.textContent = v.reason; errEl.hidden = false; return; }
-        if (!brand) { errEl.textContent = "A brand name is required."; errEl.hidden = false; return; }
+        /* Both refusals are about one field each, so both name it, mark it and
+           move to it. The amount is the only one the engine can refuse. */
+        if (!v.ok) return fail(maxEl, v.reason, errEl);
+        if (!brand) return fail(brandEl, "A brand name is required.", errEl);
 
         goEl.setAttribute("aria-disabled", "true");
         goEl.innerHTML = `<span class="spin"></span><span>Talking to Stripe…</span>`;
         try {
-          const res = await Store.bids.place({ listingId: L.id, spotId: spot.id, max, brand, logo: logoData });
+          const res = await Store.bids.place({
+            listingId: L.id,
+            /* A drawn box has no spot to name yet; the server makes one. */
+            spotId: box ? null : spot.id,
+            draw: box || null, max, brand, logo: logoData,
+          });
           if (res.url) { location.href = res.url; return; }          // Stripe's hosted page
           closeSheet();
           await refresh();
-          toast(res.demo
-            ? `Bid placed in demo mode — no card was charged. ${res.reason || ""}`.trim()
-            : "Bid placed. Your card is authorised, not charged.", "ok");
+          toast(box
+            ? "Sent. The wearer sees where you want to be and decides — your card is only authorised until they do."
+            : res.demo
+              ? `Bid placed in demo mode — no card was charged. ${res.reason || ""}`.trim()
+              : "Bid placed. Your card is authorised, not charged.", "ok");
         } catch (err) {
           errEl.textContent = err.message; errEl.hidden = false;
           goEl.removeAttribute("aria-disabled");
@@ -815,7 +1061,16 @@ function go(screen, opts = {}) {
   if (screen === "auth") {
     authNext = opts.next || null;
     if (opts.role) setRole(opts.role);
+    /* setAuthMode was never called at boot or from here, so the screen opened
+       in whatever state the markup happened to be in: the button still said
+       "Continue" instead of "Create the account", and #au-pw still carried
+       autocomplete="current-password" on a sign-up form - which is the cue a
+       password manager reads to offer a saved password instead of generating
+       a new one. It runs after setRole, which decides whether the brand field
+       belongs on screen at all. */
+    setAuthMode(opts.mode || "up");
   }
+  if (screen !== "campaign") state.arming = false;
   if (screen === "home") renderHome();
   if (screen === "browse") renderBrowse();
   if (screen === "studio") renderStudio();
@@ -846,11 +1101,14 @@ async function directory({ fresh = false } = {}) {
   return state.directory;
 }
 
-function lotCard({ l, spots, bids, c }) {
+function lotCard({ l, c }) {
   const photo = safeUrl(l.photo_front);
-  const from = spots.length
-    ? Math.min(...spots.map(s => Store.minimum(s, Store.bids.bySpot(bids)[s.id])))
-    : 0;
+  /* The entry price, not the cheapest takeover of somebody else's patch.
+     A card used to read "from $1,380" because the only spot on the garment
+     was a big one already held - a figure nobody could have paid, on a
+     listing where the smallest legal box costs a fraction of it. This is
+     what the rules actually charge for the smallest box a brand may draw. */
+  const from = Math.max(Market.RULES.MIN_AREA_PCT * Market.rateOf(l), Market.RULES.MIN_BID);
   return `<button class="lot" data-listing="${esc(l.id)}">
     <div class="shot">
       ${photo
@@ -858,16 +1116,22 @@ function lotCard({ l, spots, bids, c }) {
         : silhouetteSvg(l.garment, "front", wornBy(l))}
       <div class="tags">
         <span class="pill">${esc(garmentLabel(l))}</span>
-        ${c.open ? `<span class="pill live">${c.open} open</span>` : `<span class="pill hot">All taken</span>`}
+        ${/* Never "All taken". A spot row exists only because a sponsor drew
+              it and bid on it, so the open count is zero on every listing
+              that has ever sold anything, and the card told every brand the
+              garment was full the moment the first one bought a patch. */""}
+        ${c.total
+          ? `<span class="pill live">${plural(c.total, "sponsor")} on board · room for more</span>`
+          : `<span class="pill">Open — nothing drawn yet</span>`}
       </div>
     </div>
     <div class="body">
-      <h3>${esc(l.names || "A publisher")}</h3>
+      <h3>${esc(l.names || "A wearer")}</h3>
       <p class="meta">${esc([l.city, l.event_date].filter(Boolean).join(" · ") || "Date to come")}</p>
       <div class="meter"><i style="width:${(c.pct * 100).toFixed(1)}%"></i></div>
       <div class="foot-line">
         <span>${money(c.raised)} / ${money(c.goal)}</span>
-        <span class="open">${from ? `from ${money(from)}` : "no spots yet"}</span>
+        <span class="open">from ${money(from)} · draw any size</span>
       </div>
     </div></button>`;
 }
@@ -891,7 +1155,7 @@ async function renderHome() {
   const rows = await directory();
   if (!rows.length) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>Nobody is listed yet</h3>
-      <p>Be the first. Open a publisher account and put your garment up.</p></div>`;
+      <p>Be the first. Open a wearer account and put your garment up.</p></div>`;
     preview.innerHTML = "";
     return;
   }
@@ -953,8 +1217,8 @@ function setRole(role) {
   $("#role-brand").setAttribute("aria-pressed", String(role === "brand"));
   $("#au-brand-fld").hidden = role !== "brand";
   $("#auth-lead").textContent = role === "client"
-    ? "You photograph a garment, mark out the spots on it and set a floor under each one."
-    : "You browse the publishers, buy a spot, and your mark goes on the garment.";
+    ? "You photograph what you're wearing, front and back, set one price per 1% of the fabric, and say yes or no to each sponsor."
+    : "You drag a rectangle onto somebody's garment, and what it costs follows how big you drew it.";
 }
 $("#role-client").addEventListener("click", () => setRole("client"));
 $("#role-brand").addEventListener("click", () => setRole("brand"));
@@ -966,6 +1230,9 @@ function setAuthMode(mode) {
   $("#auth-swap-text").textContent = mode === "up" ? "Already have an account?" : "Need an account?";
   $("#auth-toggle").textContent = mode === "up" ? "Sign in" : "Create one";
   $("#role-toggle").hidden = mode === "in";
+  /* The warning belongs to the toggle; on the sign-in form there is nothing
+     left to choose and it would be warning about a decision already made. */
+  $("#role-permanent").hidden = mode === "in";
   $("#au-name").closest(".fld").hidden = mode === "in";
   $("#au-brand-fld").hidden = mode === "in" || authRole !== "brand";
   $("#au-pw").autocomplete = mode === "up" ? "new-password" : "current-password";
@@ -992,9 +1259,19 @@ $("#auth-form").addEventListener("submit", async e => {
   const name = $("#au-name").value.trim();
   const brand = $("#au-brand").value.trim();
 
-  if (!email || !password) { err.textContent = "Email and password, please."; err.hidden = false; return; }
-  if (authMode === "up" && password.length < 8) { err.textContent = "Use at least 8 characters."; err.hidden = false; return; }
-  if (authMode === "up" && !name) { err.textContent = "What should we call you?"; err.hidden = false; return; }
+  /* One field per refusal. "Email and password, please." named two fields and
+     therefore pointed at neither, which is no use to anything that has to
+     move focus to the thing that is wrong. */
+  if (!email) return fail($("#au-email"), "An email address, please.", err);
+  if (!password) return fail($("#au-pw"), "A password, please.", err);
+  if (authMode === "up" && password.length < 8) return fail($("#au-pw"), "Use at least 8 characters.", err);
+  if (authMode === "up" && !name) return fail($("#au-name"), "What should we call you?", err);
+  /* The Google path asks a brand for its name; the email path never did, so a
+     brand account could be created carrying only a person's name - and that
+     name is what gets prefilled into the bid sheet and printed on somebody
+     else's wedding dress. */
+  if (authMode === "up" && authRole === "brand" && !brand)
+    return fail($("#au-brand"), "A brand name, please — this is what gets printed on the garment.", err);
 
   btn.setAttribute("aria-disabled", "true");
   const label = btn.textContent;
@@ -1041,11 +1318,11 @@ async function askRoleIfNeeded() {
 
       <div style="display:grid;gap:11px;margin-top:22px">
         <button class="btn ghost wide" data-role="client" style="justify-content:flex-start;text-align:start;height:auto;padding:16px 20px">
-          <span><b style="display:block">I'm a publisher</b>
+          <span><b style="display:block">I'm the one wearing it</b>
           <span style="color:var(--ink-2);font-size:.86rem">I'm selling space on a gown or a suit</span></span>
         </button>
         <button class="btn ghost wide" data-role="brand" style="justify-content:flex-start;text-align:start;height:auto;padding:16px 20px">
-          <span><b style="display:block">I'm a brand</b>
+          <span><b style="display:block">I'm a sponsor</b>
           <span style="color:var(--ink-2);font-size:.86rem">I want my mark on somebody's garment</span></span>
         </button>
       </div>
@@ -1054,7 +1331,7 @@ async function askRoleIfNeeded() {
         <label for="rc-brand">Brand name</label>
         <input class="inp" id="rc-brand" type="text" maxlength="60" placeholder="What should appear on the garment?">
       </div>
-      <p class="err" id="rc-err" hidden></p>
+      <p class="err" id="rc-err" role="alert" hidden></p>
       <button class="btn wide" id="rc-go" style="margin-top:16px" aria-disabled="true">Confirm</button>`,
 
     onOpen(root) {
@@ -1064,7 +1341,10 @@ async function askRoleIfNeeded() {
 
       $$("[data-role]", root).forEach(b => b.addEventListener("click", () => {
         picked = b.dataset.role;
-        $$("[data-role]", root).forEach(x => x.style.borderColor = "");
+        /* A button never fires `input`, so the mark `fail` left on it has to
+           come off here - otherwise the choice stays flagged after it is made. */
+        $$("[data-role]", root).forEach(x => { x.style.borderColor = ""; x.removeAttribute("aria-invalid"); });
+        $("#rc-err", root).hidden = true;
         b.style.borderColor = "var(--magenta)";
         brandFld.hidden = picked !== "brand";
         go.removeAttribute("aria-disabled");
@@ -1073,16 +1353,20 @@ async function askRoleIfNeeded() {
       go.addEventListener("click", async () => {
         const err = $("#rc-err", root);
         err.hidden = true;
-        if (!picked) { err.textContent = "Pick one."; err.hidden = false; return; }
-        const brand = picked === "brand" ? $("#rc-brand", root).value.trim() : null;
-        if (picked === "brand" && !brand) { err.textContent = "A brand name is required."; err.hidden = false; return; }
+        /* Focus goes to the first of the two choices, not just to the message
+           about them - it is the only thing on the sheet that can be acted on. */
+        if (!picked) return fail($("[data-role]", root), "Pick one.", err);
+        const brandEl = $("#rc-brand", root);
+        const brand = picked === "brand" ? brandEl.value.trim() : null;
+        if (picked === "brand" && !brand)
+          return fail(brandEl, "A brand name is required — it is what gets printed on the garment.", err);
         go.setAttribute("aria-disabled", "true");
         go.innerHTML = `<span class="spin"></span>`;
         try {
           await Store.auth.chooseRole(picked, brand);
           askingRole = false;
           closeSheet();
-          toast(picked === "client" ? "You're set up as a publisher." : `Bidding as ${brand}.`, "ok");
+          toast(picked === "client" ? `You're set up as a ${SIDE.client}.` : `Bidding as ${brand}.`, "ok");
           if (picked === "client") await enterStudio(); else renderAccount();
         } catch (e) {
           err.textContent = e.message; err.hidden = false;
@@ -1106,10 +1390,11 @@ function renderAccount() {
       <button class="btn ghost wide" id="mob-in">Sign in</button>
       <button class="btn wide" id="mob-get">Get a spot</button>`;
     $$("#nav-get, #mob-get").forEach(b => b.addEventListener("click", () => go("browse")));
-    $$("#nav-in, #mob-in").forEach(b => b.addEventListener("click", () => {
-      go("auth", { role: "brand" });
-      setAuthMode("in");
-    }));
+    /* The mode travels with the navigation rather than being applied after it:
+       go() now initialises the form, so a setAuthMode() afterwards was either
+       redundant or - once go() started doing it - a second render of the same
+       screen. */
+    $$("#nav-in, #mob-in").forEach(b => b.addEventListener("click", () => go("auth", { role: "brand", mode: "in" })));
     return;
   }
 
@@ -1131,17 +1416,17 @@ function renderAccount() {
    ========================================================================= */
 async function enterStudio() {
   const u = Store.auth.current();
-  if (!u || u.role !== "client") { toast("Only a publisher has a listing."); return; }
+  if (!u || u.role !== "client") { toast(`Only a ${SIDE.client} has a listing.`); return; }
   let mine = await Store.listings.mine();
   if (!mine.length) {
     const created = await Store.listings.create({
       names: u.name, garment: "gown",
       closes_at: new Date(Date.now() + 7 * 86400000).toISOString(),
-      headline: "Walking billboard for your brand",
+      headline: "Walking billboard for your mark",
       tagline: "Your logo on the dress, worn all day.",
     });
     mine = [created];
-    toast("Listing created. Upload a photograph and mark out your first spot.", "ok");
+    toast("Listing created. Upload a front and a back photograph, then set your rate.", "ok");
   }
   await load(mine[0].id);
   go("studio");
@@ -1157,10 +1442,19 @@ async function renderStudio() {
   $("#studio-meta").textContent = [L.city, L.event_date, plural(state.spots.length, "spot"),
     L.is_open ? "Bidding open" : "Not open yet"].filter(Boolean).join(" · ");
 
+  const onBoard = state.spots.filter(s => s.approved !== false).length;
+  const waiting = state.spots.length - onBoard;
+
   $("#studio-stats").innerHTML = `
     <div class="stat"><div class="k">Committed</div><div class="v w">${money(c.raised)}</div><div class="d">of ${money(c.goal)}</div></div>
-    <div class="stat"><div class="k">Bids</div><div class="v">${state.bids.length}</div><div class="d">from ${plural(new Set(state.bids.map(b => b.bidder)).size, "brand")}</div></div>
-    <div class="stat"><div class="k">Spots held</div><div class="v g">${c.held}/${c.total}</div><div class="d">${c.open} still open</div></div>
+    <div class="stat"><div class="k">Bids</div><div class="v">${state.bids.length}</div><div class="d">from ${plural(new Set(state.bids.map(b => b.bidder)).size, SIDE.brand)}</div></div>
+    ${/* Not "Spots held N/M". Every spot on this listing exists because a brand
+          drew it and bid on it, so `held` and `total` were the same number and
+          `open` was always zero - a stat that could only ever read "3/3, 0
+          still open". What the publisher actually needs to know is how many
+          are on the garment and how many are still waiting on a yes. */""}
+    <div class="stat"><div class="k">Sponsors on board</div><div class="v g">${onBoard}</div>
+      <div class="d">${waiting ? `${plural(waiting, SIDE.brand)} waiting on you` : "room for more"}</div></div>
     <div class="stat"><div class="k">Closes in</div><div class="v a">${esc(Market.countdown(L.closes_at))}</div><div class="d">your deadline</div></div>`;
 
   $("#studio-spotcount").textContent = plural(state.spots.length, "spot");
@@ -1168,8 +1462,7 @@ async function renderStudio() {
 
   /* the editable garment */
   const side = state.studioSide;
-  $("#studio-garment").innerHTML = garmentPanel(side, { interactive: true, editing: state.drawing });
-  wireStudioGarment();
+  $("#studio-garment").innerHTML = garmentPanel(side, { interactive: false, showPending: true });
 
   /* bids table */
   const rows = state.bids.slice().sort((a, b) => b.at - a.at).map(b => {
@@ -1177,7 +1470,7 @@ async function renderStudio() {
     const st = spot ? Store.market(spot, bySpot[spot.id]) : null;
     const holding = st && st.holder === b.bidder;
     return `<tr>
-      <td data-k="Brand">${esc(b.brand)}</td>
+      <td data-k="${Side("brand")}">${esc(b.brand)}</td>
       <td data-k="Spot">${spot ? `${esc(spot.side)} ${String(+spot.n).padStart(2, "0")} · ${esc(spot.name)}` : "—"}</td>
       <td data-k="Maximum" class="num">${money(b.max)}</td>
       <td data-k="Standing" class="num">${st && holding ? money(st.price) : "—"}</td>
@@ -1195,23 +1488,32 @@ async function renderStudio() {
   $("#t-names").value = L.names || "";
   $("#t-city").value = L.city || "";
   $("#t-goal").value = L.goal || 0;
-  $("#t-closes").value = L.closes_at ? new Date(L.closes_at).toISOString().slice(0, 16) : "";
+  $("#t-closes").value = localInputValue(L.closes_at);
+  /* The field cannot be set to a close that has already been and gone, or to
+     one so close that nobody can answer the last bid. The browser enforces
+     the same bound the submit handler does. */
+  $("#t-closes").min = localInputValue(Date.now() + MIN_LEAD_MS);
+  $("#t-closes-tz").textContent = "(" + localZoneName() + ")";
   $("#t-headline").value = L.headline || "";
   $("#t-tagline").value = L.tagline || "";
   $("#t-about").value = L.about || "";
   $("#t-ig").value = L.instagram || "";
   $("#t-tw").value = L.twitter || "";
+  $("#t-rate").value = rateOf(L);
+  $("#t-frontmul").value = frontMultiplierOf(L);
+  drawRateExample();
   $("#terms-open").textContent = L.is_open ? "Close the bidding" : "Open the bidding";
 
   $("#e-invited").value = L.invited || 0;
   $("#e-confirmed").value = L.confirmed || 0;
-  $("#e-date").value = L.event_date || "";
+  /* Not the same bug as #t-closes: `event_date` is a plain date on both sides
+     and never passes through a Date, so nothing shifts it. The slice is
+     insurance against a row that arrives as a full timestamp - an <input
+     type="date"> rejects "2026-09-16T00:00:00Z" outright and silently clears
+     itself, which would look exactly like the publisher's date being lost. */
+  $("#e-date").value = String(L.event_date || "").slice(0, 10);
   $("#e-venue").value = L.venue || "";
-  $("#e-venuetype").value = L.venue_type || "";
-  $("#e-shooters").value = L.shooters || "";
   $("#e-reach").value = L.reach || 0;
-  $("#e-hashtag").value = L.hashtag || "";
-  $("#e-press").value = L.press || "";
   $("#e-live").checked = !!L.livestream;
 
   const a = audience(L);
@@ -1222,170 +1524,371 @@ async function renderStudio() {
       ${a.livestream ? `<div class="ln"><span class="k">Livestream</span><span class="v">${num(a.livestream)}</span></div>` : ""}
       <div class="ln tot"><span class="k">Estimated impressions</span><span class="v">${num(a.total)}</span></div>
     </div>`;
+
+  renderPending(bySpot);
+  syncDrops();
 }
 
-/* ---------------------------------------------------- drawing out a spot */
-function wireStudioGarment() {
-  const pane = $("#studio-garment .garment");
-  if (!pane) return;
+/* =========================================================================
+   the rate card
 
-  $$("#studio-garment .spot").forEach(b =>
-    b.addEventListener("click", e => { e.stopPropagation(); editSpot(b.dataset.spot); }));
+   A publisher does not price thirteen rectangles any more. They price one
+   percent of the fabric, and the arithmetic does the rest - which is the only
+   way a brand can draw a box nobody anticipated and still be quoted a number
+   the publisher would have chosen.
+   ========================================================================= */
+/* The rate and the multiplier are read by the engine, not by a second copy of
+   the defaults living here - a page that disagreed with the server about what
+   an unset rate means would quote a price the server then refused. */
+const rateOf = L => Market.rateOf(L);
+const frontMultiplierOf = L => Market.frontMultiplierOf(L);
+const boxPrice = (box, L) => Market.priceForBox(box, L);
+const areaOf = box => (Number(box.w) * Number(box.h)) / 100;
 
-  if (!state.drawing) return;
+function drawRateExample() {
+  const L = {
+    rate_per_percent: Number($("#t-rate").value) || 0,
+    front_multiplier: Number($("#t-frontmul").value) || 1,
+  };
+  const chest = { side: "front", w: 27, h: 10 };
+  const small = { side: "back", w: 14, h: 8 };
+  $("#rate-example").textContent =
+    `A chest-sized box on the front is ${money(boxPrice(chest, L))}. ` +
+    `A small one on the back is ${money(boxPrice(small, L))}.`;
+}
+$$("#t-rate, #t-frontmul").forEach(el => el.addEventListener("input", drawRateExample));
 
-  let start = null, draft = null;
+/* ------------------------------------------------------ brands waiting on a yes
+   A drawn spot is somebody's proposal to print on your body. It holds their
+   money and none of our opinions: until the publisher says yes it is not on
+   the garment and not on the public page. */
+function renderPending(bySpot) {
+  const pending = state.spots.filter(s => s.approved === false && !s.declined);
+  $("#pending-card").hidden = !pending.length;
+  $("#pending-count").textContent = String(pending.length);
+  if (!pending.length) return;
+
+  const L = state.listing;
+  $("#pending-list").innerHTML = pending.map(s => {
+    const st = Store.market(s, bySpot[s.id]);
+    const photo = safeUrl(L["photo_" + s.side]);
+    return `<div class="pend">
+      <div class="pend-thumb">
+        ${photo ? `<img src="${esc(photo)}" alt="">` : ""}
+        <i style="top:${+s.y}%;left:${+s.x}%;width:${+s.w}%;height:${+s.h}%"></i>
+      </div>
+      <div style="min-width:0">
+        <h4>${esc(st.holderName || `A ${SIDE.brand}`)}</h4>
+        <p class="hint">${esc(s.side)} · ${areaOf(s).toFixed(1)}% of the garment · ${money(st.price)}</p>
+      </div>
+      <div class="chips">
+        <button class="btn sm" data-approve="${esc(s.id)}">Accept</button>
+        <button class="btn danger sm" data-decline="${esc(s.id)}">Decline</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  $$("#pending-list [data-approve]").forEach(b => b.addEventListener("click", async () => {
+    try {
+      await Store.spots.update(b.dataset.approve, { approved: true });
+      toast("Accepted — it goes on the garment.", "ok");
+      await refresh();
+    } catch (e) { toast(e.message, "bad"); }
+  }));
+  $$("#pending-list [data-decline]").forEach(b => b.addEventListener("click", () => {
+    const spot = state.spots.find(x => x.id === b.dataset.decline);
+    if (!spot) return;
+    const st = Store.market(spot, Store.bids.bySpot(state.bids)[spot.id]);
+    const who = st.holderName || "this sponsor";
+
+    /* A sheet rather than confirm(): this releases somebody's money and the
+       native dialog cannot say whose, or how much, or that it is final. */
+    openSheet({
+      kicker: "Decline",
+      title: `Say no to ${who}?`,
+      body: `
+        <p class="lead" style="font-size:.95rem">Their authorisation of
+          <b>${money(st.price)}</b> is released in full and the rectangle comes off your
+          garment. They are told you declined. This cannot be undone — they would have to
+          draw it again.</p>
+        <p class="err" id="dec-err" role="alert" style="margin-top:18px" hidden></p>
+        <div style="display:grid;gap:10px;margin-top:20px">
+          <button class="btn danger wide" id="dec-go">Decline and release their card</button>
+          <button class="btn ghost wide" id="dec-no">Keep it for now</button>
+        </div>`,
+      onOpen(root) {
+        $("#dec-no", root).addEventListener("click", closeSheet);
+        $("#dec-go", root).addEventListener("click", async () => {
+          const go = $("#dec-go", root), err = $("#dec-err", root);
+          err.hidden = true;
+          go.setAttribute("aria-disabled", "true");
+          go.innerHTML = `<span class="spin"></span><span>Releasing their card…</span>`;
+          try {
+            /* Never a delete. `bids.spot_id` cascades, so removing the spot
+               removes the bid that carries the Stripe payment intent, after
+               which the hold cannot be cancelled by anyone - while this very
+               toast says it was. The server releases first, then marks. */
+            await Store.spots.decline(spot.id);
+            closeSheet();
+            toast(`Declined. ${who}'s card is released.`, "ok");
+            await refresh();
+          } catch (e) {
+            err.textContent = e.message;
+            err.hidden = false;
+            go.removeAttribute("aria-disabled");
+            go.textContent = "Try again";
+          }
+        });
+      },
+    });
+  }));
+}
+
+/* =========================================================================
+   drawing
+
+   The brand draws, not the publisher. A brand drags a rectangle anywhere on
+   the photograph and is quoted on the spot: the price is the area it covers
+   times the publisher's rate, so there is no menu of positions to maintain
+   and nothing stops a brand asking for a shape nobody anticipated.
+
+   The same drag is wired to whichever garment panel is on screen, so it works
+   on the front, on the back, and on a phone.
+   ========================================================================= */
+/* The engine writes its refusals for a dialog box. Inside a rectangle that is
+   still being dragged there is room for about four words, so the three rules
+   that actually bite while the hand is moving get a shorter telling. The
+   verdict itself is always `Market.validateBox`; this only chooses the
+   wording, and falls back to the engine's own sentence for anything else. */
+function shortRefusal(reason, box, onSide, bySpot) {
+  const area = Market.areaPercent(box);
+  if (area < Market.RULES.MIN_AREA_PCT) return "Too small — keep going";
+  if (area > Market.RULES.MAX_AREA_PCT) return `Too big, over ${Market.RULES.MAX_AREA_PCT}%`;
+  const hit = (onSide || []).find(s => Market.boxesOverlap(box, {
+    x: +s.x, y: +s.y, w: +s.w, h: +s.h,
+  }));
+  if (hit) {
+    const who = Store.market(hit, bySpot && bySpot[hit.id]).holderName;
+    return `${who || "Somebody"} is already here`;
+  }
+  return reason;
+}
+
+function wireDrawing(pane, onBox) {
+  let start = null, draft = null, label = null;
+  /* The last rectangle that was refused, left painted on the cloth with the
+     reason on it. It is cleared by the next pointerdown and by nothing else,
+     so the brand can look at what it drew while it reads why it cannot have
+     it - which is the one thing a toast in the corner cannot offer. */
+  let refused = null;
+  let onSide = [], bySpot = {};
+
   const pct = e => {
     const r = pane.getBoundingClientRect();
-    const p = e.touches ? e.touches[0] : e;
     return {
-      x: Math.min(100, Math.max(0, ((p.clientX - r.left) / r.width) * 100)),
-      y: Math.min(100, Math.max(0, ((p.clientY - r.top) / r.height) * 100)),
+      x: Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100)),
+      y: Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100)),
     };
   };
+  const boxFrom = now => ({
+    x: +Math.min(start.x, now.x).toFixed(2), y: +Math.min(start.y, now.y).toFixed(2),
+    w: +Math.abs(now.x - start.x).toFixed(2), h: +Math.abs(now.y - start.y).toFixed(2),
+  });
 
-  const down = e => {
-    if (e.target.closest(".spot")) return;
+  const clear = () => { if (draft) draft.remove(); draft = null; label = null; start = null; };
+
+  /* Hand the rectangle over to `refused` instead of deleting it. */
+  const refuse = reason => {
+    if (!draft) return;
+    draft.classList.add("bad");
+    if (label) label.textContent = reason;
+    if (refused) refused.remove();
+    refused = draft;
+    draft = null; label = null; start = null;
+  };
+
+  pane.addEventListener("pointerdown", e => {
+    /* No dead zones while armed. This used to bail when the press landed on an
+       existing spot, on the theory that the press was aimed at the spot - but
+       drawing is only wired up once the brand has said it wants to draw, and a
+       crowded garment then has invisible patches where nothing happens at all
+       and nothing explains why. The spots stop taking clicks instead. */
     e.preventDefault();
+    /* Capture keeps the drag alive when the finger leaves the photograph, but
+       it throws outright if the id is not an active pointer - a synthesised
+       event, a pointer another element already captured, one the browser has
+       cancelled. Uncaught, that abandons the whole handler and the drag never
+       starts, so the failure is the one thing it must not be: silent. */
+    try { pane.setPointerCapture(e.pointerId); } catch { /* drag still works */ }
+    if (refused) { refused.remove(); refused = null; }
+    /* A press that arrives while a draft is still in flight - a cancelled
+       drag whose pointerup never came, a second finger - would otherwise
+       abandon the old rectangle on the photograph for good. */
+    clear();
     start = pct(e);
+    /* Gathered once per drag, not once per frame: the neighbours cannot
+       change while a finger is down, and rebuilding the bid index sixty times
+       a second to draw one label would be work for nothing. */
+    onSide = state.spots.filter(s => s.side === pane.dataset.side);
+    bySpot = Store.bids.bySpot(state.bids);
     draft = document.createElement("div");
     draft.className = "spot-draft";
+    /* Placed at the press, not left to find a static position. A drag moves
+       it on the first frame anyway; a tap never gets one, and the refusal
+       has to appear under the finger rather than wherever the box happened
+       to flow to. */
+    Object.assign(draft.style, { left: start.x + "%", top: start.y + "%", width: "0%", height: "0%" });
+    label = document.createElement("span");
+    draft.append(label);
     pane.append(draft);
-  };
-  const move = e => {
+  });
+
+  pane.addEventListener("pointermove", e => {
     if (!start || !draft) return;
     e.preventDefault();
-    const now = pct(e);
+    const box = { ...boxFrom(pct(e)), side: pane.dataset.side };
     Object.assign(draft.style, {
-      left: Math.min(start.x, now.x) + "%", top: Math.min(start.y, now.y) + "%",
-      width: Math.abs(now.x - start.x) + "%", height: Math.abs(now.y - start.y) + "%",
+      left: box.x + "%", top: box.y + "%", width: box.w + "%", height: box.h + "%",
     });
-  };
-  const up = async e => {
+    /* The number moves with the hand. Quoting only after the drag ends makes
+       the price feel like a verdict; quoting during it makes it a dial.
+
+       And the same is true of the refusal. A box that is too small, too big
+       or on top of somebody else says so while it is still being dragged,
+       against the same rules the release will be judged by - so the brand
+       corrects the shape it is holding rather than being told afterwards
+       about one it no longer has. The price comes straight back the instant
+       the box is legal again. */
+    const check = Market.validateBox(box, state.listing, onSide);
+    draft.classList.toggle("bad", !check.ok);
+    label.textContent = check.ok
+      ? money(boxPrice(box, state.listing))
+      : shortRefusal(check.reason, box, onSide, bySpot);
+  });
+
+  const finish = e => {
     if (!start || !draft) return;
-    const now = pct(e.changedTouches ? { clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY } : e);
-    const box = {
-      x: +Math.min(start.x, now.x).toFixed(2), y: +Math.min(start.y, now.y).toFixed(2),
-      w: +Math.abs(now.x - start.x).toFixed(2), h: +Math.abs(now.y - start.y).toFixed(2),
-    };
-    draft.remove(); draft = null; start = null;
-    if (box.w < 4 || box.h < 3) { toast("Too small to print on. Drag out a bigger area."); return; }
+    const box = { ...boxFrom(pct(e)), side: pane.dataset.side };
+    /* A tap used to be swallowed here without a word, on a panel the brand
+       had just deliberately armed - so the one gesture a first-timer tries
+       did nothing at all and nothing said why. */
+    if (box.w < 1 || box.h < 1) { refuse("That was a tap. Drag a rectangle out."); return; }
 
-    /* The label inside a spot is sized in container units off the spot's own
-       WIDTH (22cqw for the number, 13cqw for the price), so a very wide, very
-       short box cannot fit its own text - at 200% browser text it clips. CSS
-       can only set one global floor, so the proportion is enforced here where
-       the shape is actually decided. The garment box is 3:4, which is where
-       the 0.28 comes from: 0.37 of the width in rendered pixels. */
-    const minH = +(box.w * 0.28).toFixed(2);
-    if (box.h < minH) {
-      box.h = Math.min(minH, 100 - box.y);
-      toast("Made that spot a little taller so its price still fits inside it.");
-    }
-    newSpot(box);
+    /* clear() after the verdict, not before. Removing the draft first meant
+       every refusal deleted the rectangle it was about, leaving a toast in
+       the corner of the screen and bare cloth where the box had been. */
+    const reason = onBox(box);
+    if (reason) { refuse(reason); return; }
+    clear();
   };
-
-  pane.addEventListener("pointerdown", down);
-  pane.addEventListener("pointermove", move);
-  pane.addEventListener("pointerup", up);
-  pane.addEventListener("pointercancel", () => { if (draft) draft.remove(); draft = null; start = null; });
+  pane.addEventListener("pointerup", finish);
+  pane.addEventListener("pointercancel", clear);
 }
 
-function newSpot(box) {
-  const side = state.studioSide;
-  const n = state.spots.filter(s => s.side === side).length + 1;
-  spotSheet({ ...box, side, n, name: "New spot", floor: 350, blurb: "", badge: null }, async patch => {
-    const created = await Store.spots.create(state.listing.id, patch);
-    state.spots.push(created);
-    toast("Spot added.", "ok");
-    await refresh();
-  });
+/* -------------------------------------------------------------- arming
+   The toggle is the whole affordance: "drag the photograph" is not a thing
+   anybody guesses, and on a phone an always-live drag surface eats the scroll.
+   Arming also gives us somewhere honest to say no - a visitor who cannot draw
+   yet is told why on the tap, rather than dragging and getting nothing. */
+function setArming(on) {
+  const refusal = on ? drawingRefusal() : null;
+  if (refusal) { toast(refusal); return; }
+  state.arming = !!on;
+  renderGarment(true);
+  if (state.arming) toast("Drag a rectangle over the patch you want.");
 }
 
-function editSpot(id) {
-  const spot = state.spots.find(s => s.id === id);
-  if (!spot) return;
-  spotSheet(spot, async patch => {
-    await Store.spots.update(id, patch);
-    toast("Spot updated.", "ok");
-    await refresh();
-  }, async () => {
-    await Store.spots.remove(id);
-    toast("Spot removed.");
-    await refresh();
-  });
+function syncDrawToggle() {
+  const btn = $("#draw-toggle");
+  if (!btn) return;
+  const blocked = drawingRefusal();
+  btn.hidden = !!blocked;
+  btn.setAttribute("aria-pressed", String(state.arming));
+  btn.textContent = state.arming ? "Cancel" : "Draw an area";
+  btn.classList.toggle("ghost", state.arming);
+  $("#draw-hint").textContent = state.arming
+    ? "Drag across the fabric. The price follows the size of the box."
+    : blocked || "Pick the patch of fabric you want — the price follows its size.";
 }
 
-function spotSheet(spot, onSave, onDelete) {
-  openSheet({
-    kicker: `${spot.side} · position ${String(+spot.n).padStart(2, "0")}`,
-    title: spot.id ? "Edit this spot" : "Mark out a spot",
-    body: `
-      <form id="spot-form" novalidate>
-        <div class="row2">
-          <div class="fld"><label for="sp-name">Name it</label>
-            <input class="inp" id="sp-name" type="text" maxlength="40" value="${esc(spot.name)}" required></div>
-          <div class="fld"><label for="sp-floor">Floor price</label>
-            <input class="inp num" id="sp-floor" type="number" min="1" step="1" value="${+spot.floor}" required></div>
-        </div>
-        <div class="row2">
-          <div class="fld"><label for="sp-n">Position number</label>
-            <input class="inp num" id="sp-n" type="number" min="1" step="1" value="${+spot.n}"></div>
-          <div class="fld"><label for="sp-badge">Badge (optional)</label>
-            <input class="inp" id="sp-badge" type="text" maxlength="10" value="${esc(spot.badge || "")}" placeholder="MEGA"></div>
-        </div>
-        <div class="fld"><label for="sp-blurb">Why a brand wants it</label>
-          <textarea class="inp" id="sp-blurb" maxlength="240">${esc(spot.blurb || "")}</textarea></div>
-        <div class="quote">
-          <div class="ln"><span class="k">Placement</span>
-            <span class="v">${(+spot.x).toFixed(1)}%, ${(+spot.y).toFixed(1)}% · ${(+spot.w).toFixed(1)} × ${(+spot.h).toFixed(1)}</span></div>
-        </div>
-        <p class="err" id="sp-err" hidden></p>
-        <button class="btn wide" type="submit" style="margin-top:16px">Save the spot</button>
-        ${onDelete ? `<button class="btn quiet wide sm" type="button" id="sp-del" style="margin-top:10px">Remove it</button>` : ""}
-      </form>`,
-    onOpen(root) {
-      $("#spot-form", root).addEventListener("submit", async e => {
-        e.preventDefault();
-        const err = $("#sp-err", root);
-        const patch = {
-          side: spot.side, x: +spot.x, y: +spot.y, w: +spot.w, h: +spot.h,
-          name: $("#sp-name", root).value.trim(),
-          floor: Number($("#sp-floor", root).value),
-          n: Number($("#sp-n", root).value) || 1,
-          badge: $("#sp-badge", root).value.trim().toUpperCase() || null,
-          blurb: $("#sp-blurb", root).value.trim(),
-        };
-        if (!patch.name) { err.textContent = "Give it a name."; err.hidden = false; return; }
-        if (!(patch.floor >= 1)) { err.textContent = "The floor must be at least 1."; err.hidden = false; return; }
-        try { await onSave(patch); closeSheet(); }
-        catch (e2) { err.textContent = e2.message; err.hidden = false; }
-      });
-      const del = $("#sp-del", root);
-      if (del) del.addEventListener("click", async () => {
-        if (!confirm("Remove this spot? Any bids on it are void.")) return;
-        try { await onDelete(); closeSheet(); }
-        catch (e2) { toast(e2.message, "bad"); }
-      });
-    },
-  });
+$("#draw-toggle").addEventListener("click", () => setArming(!state.arming));
+
+/* Everything a brand needs to be true before it can draw at all. */
+function drawingRefusal() {
+  const L = state.listing;
+  if (!L || !L.is_open) return "Bidding is not open on this listing yet.";
+  if (!L.photo_front || !L.photo_back) return "This listing does not have both photographs up yet.";
+  return null;
 }
 
-/* --------------------------------------------------------------- uploads */
+/* A drawn box, from the drag to the bid sheet.
+
+   Returns null when the box is on its way somewhere - the sheet, or the
+   sign-up screen - and the reason when it is not. The caller is the drag
+   itself, which keeps the rectangle on the cloth and writes the reason onto
+   it, so a refusal is answered where it happened. */
+function claimBox(box) {
+  const L = state.listing;
+  const refusal = drawingRefusal();
+  if (refusal) return refusal;
+
+  /* The shape is judged before the account is, and that order matters: a box
+     that breaks the rules is refused where it was drawn, instead of sending
+     somebody off to open an account and refusing them once they are back. */
+  const onSide = state.spots.filter(s => s.side === box.side);
+  const check = Market.validateBox(box, L, onSide);
+  /* The engine's own sentence, not the four-word version. That one exists
+     because a label inside a moving rectangle has no room; a refusal that has
+     stopped moving has all the room it needs, and can say which spot was
+     overlapped and why that matters. */
+  if (!check.ok) return check.reason;
+
+  const user = Store.auth.current();
+  if (!user) {
+    /* This one leaves the screen, so there is no rectangle left to mark - and
+       the retry after sign-up has none either, which is why it has to say out
+       loud whatever it is refused for the second time. */
+    toast("Open an account to claim that area.");
+    go("auth", { role: "brand", next: () => { const why = claimBox(box); if (why) toast(why, "bad"); } });
+    return null;
+  }
+  if (user.role !== "brand") return `You are signed in as a ${SIDE.client}. Buying space is for ${SIDE.brand}s.`;
+
+  /* Drawing stops here and nowhere earlier: this is the first moment the box
+     is known to be one the brand can actually have. */
+  setArming(false);
+  openBid(null, box);
+  return null;
+}
+
+/* ------------------------------------------------------- the photographs
+   Both are required before the bidding can open, so this is the first thing a
+   publisher does and the one thing that must not be fiddly. Drag a file onto
+   the box or tap it; either way the same handler runs.
+
+   This wiring was lost once already, when the publisher's spot editor was
+   removed and took the neighbouring listener out with it. The symptom was
+   silent: the file dialog opened, a file was chosen, and nothing happened at
+   all - which, because a listing cannot open without both photographs, meant
+   nobody who signed up could sell anything. */
 $$(".drop[data-side]").forEach(drop => {
   const side = drop.dataset.side;
   const input = $("input[type=file]", drop);
 
-  ["dragenter", "dragover"].forEach(ev =>
-    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
-  ["dragleave", "drop"].forEach(ev =>
-    drop.addEventListener(ev, () => drop.classList.remove("over")));
+  input.addEventListener("change", e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) upload(side, f, drop);
+  });
+
+  /* Dropping a file on the page navigates to it unless both of these are
+     cancelled, which looks exactly like the app crashing. */
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
   drop.addEventListener("drop", e => {
     e.preventDefault();
-    if (e.dataTransfer.files[0]) upload(side, e.dataTransfer.files[0], drop);
-  });
-  input.addEventListener("change", e => {
-    if (e.target.files[0]) upload(side, e.target.files[0], drop);
+    drop.classList.remove("over");
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) upload(side, f, drop);
   });
 });
 
@@ -1394,15 +1897,37 @@ async function upload(side, file, drop) {
   const big = $(".big", drop);
   const was = big.textContent;
   big.textContent = "Uploading…";
+  drop.classList.remove("has");
   try {
     await Store.photos.upload(state.listing.id, side, file);
     big.textContent = "Uploaded ✓";
+    /* The accepted state was written months ago and never fired, because
+       nothing ever added the class. An upload that looks identical to no
+       upload is how somebody ends up convinced the button is broken. */
+    drop.classList.add("has");
     toast(`${side[0].toUpperCase() + side.slice(1)} photograph saved.`, "ok");
     await refresh();
   } catch (e) {
     big.textContent = was;
     toast(e.message, "bad");
   }
+}
+
+/* On every studio render, say which photographs are already up. Without this a
+   publisher who comes back tomorrow sees two empty boxes and re-uploads what
+   is already there. */
+function syncDrops() {
+  const L = state.listing;
+  $$("#screen-studio .drop[data-side]").forEach(drop => {
+    const has = !!(L && L["photo_" + drop.dataset.side]);
+    drop.classList.toggle("has", has);
+    const big = $(".big", drop);
+    if (big) big.textContent = has ? "Uploaded ✓" : "Drop a photo";
+    const small = $(".small", drop);
+    if (small) small.textContent = has
+      ? "Tap to replace it"
+      : "or tap to choose · JPG or PNG · up to 8MB";
+  });
 }
 
 /* ------------------------------------------------------------ studio bits */
@@ -1414,26 +1939,54 @@ function syncStudioSide() {
   renderStudio();
 }
 
-$("#studio-draw").addEventListener("click", () => {
-  state.drawing = !state.drawing;
-  $("#studio-draw").setAttribute("aria-pressed", String(state.drawing));
-  $("#studio-draw").textContent = state.drawing ? "Done drawing" : "Draw a spot";
-  if (state.drawing) toast("Drag a rectangle on the photograph.");
-  renderStudio();
-});
-
-$("#studio-clear").addEventListener("click", async () => {
-  const doomed = state.spots.filter(s => s.side === state.studioSide);
-  if (!doomed.length) return;
-  if (!confirm(`Remove all ${doomed.length} spots on the ${state.studioSide}?`)) return;
-  for (const s of doomed) await Store.spots.remove(s.id);
-  toast("Cleared.");
-  await refresh();
-});
-
 $("#terms-form").addEventListener("submit", async e => {
   e.preventDefault();
   const err = $("#terms-err"); err.hidden = true;
+
+  /* Everything below refuses rather than repairs. The form used to accept a
+     blank or an out-of-range answer and write a different number than the one
+     on screen, which is the worst of both: the publisher's terms were wrong
+     and the page agreed with them. */
+
+  /* A blank rate saved as 0, and `priceForBox` then floored every patch of
+     every size at the $1 minimum bid. The garment was being given away. */
+  const rate = Number($("#t-rate").value);
+  if (!Number.isFinite(rate) || rate < 1)
+    return fail($("#t-rate"), "Put a price on 1% of the garment. Left empty it saves as 0, "
+      + "and every patch a brand draws is then priced at the $1 minimum.", err);
+
+  /* Math.min(5, Math.max(1, …)) quietly rewrote what she typed while the box
+     still showed the original, so a publisher who meant ×8 got ×5 and was
+     never told. */
+  const mul = Number($("#t-frontmul").value);
+  if (!Number.isFinite(mul) || mul < 1 || mul > 5)
+    return fail($("#t-frontmul"), "The front premium has to be between 1 and 5.", err);
+
+  /* A blank close does not mean "never closes". It writes closes_at: null,
+     and the settlement job's `if (!force && closes && now < closes)` guard is
+     then skipped entirely - so the next run captures every card on the
+     listing at once, whenever it happens to fire. */
+  const closesRaw = $("#t-closes").value;
+  if (!closesRaw)
+    return fail($("#t-closes"), "Say when the bidding closes. A blank one is not \"never\" — "
+      + "it lets the settlement job capture every card on its next run.", err);
+  const closes = new Date(closesRaw);
+  if (Number.isNaN(closes.getTime()))
+    return fail($("#t-closes"), "That is not a date and time we can read.", err);
+  if (closes.getTime() < Date.now() + MIN_LEAD_MS)
+    return fail($("#t-closes"), "Leave at least an hour. A close any sooner gives nobody "
+      + "time to answer the last bid.", err);
+
+  /* Bidding that runs past the day itself settles after the garment has been
+     worn, so whoever won it is charged for a patch that was never printed. */
+  const eventDay = $("#e-date").value;
+  if (eventDay) {
+    const endOfDay = new Date(eventDay + "T23:59:59");
+    if (!Number.isNaN(endOfDay.getTime()) && closes.getTime() > endOfDay.getTime())
+      return fail($("#t-closes"), `Bidding has to close on or before the day itself, ${eventDay}. `
+        + "There is nothing to print after it.", err);
+  }
+
   try {
     await Store.listings.update(state.listing.id, {
       garment: $("#t-garment").value,
@@ -1441,7 +1994,12 @@ $("#terms-form").addEventListener("submit", async e => {
       names: $("#t-names").value.trim(),
       city: $("#t-city").value.trim(),
       goal: Number($("#t-goal").value) || 0,
-      closes_at: $("#t-closes").value ? new Date($("#t-closes").value).toISOString() : null,
+      rate_per_percent: rate,
+      front_multiplier: mul,
+      /* `closes` came out of a datetime-local, so it is already local time
+         read as local time. This is the correct half of the round trip - the
+         fill in renderStudio is the half that had to change. */
+      closes_at: closes.toISOString(),
       headline: $("#t-headline").value.trim(),
       tagline: $("#t-tagline").value.trim(),
       about: $("#t-about").value.trim(),
@@ -1455,7 +2013,25 @@ $("#terms-form").addEventListener("submit", async e => {
 
 $("#terms-open").addEventListener("click", async () => {
   const L = state.listing;
-  if (!L.is_open && !state.spots.length) { toast("Mark out at least one spot first.", "bad"); return; }
+  /* Brands draw their own spot straight onto the photograph, so a listing with
+     only one side uploaded is a listing half of which cannot be sold.
+
+     The refusal used to be a toast in the corner naming neither side, while
+     the two drop boxes sit in the other column and may well be scrolled off.
+     Now it names the missing side and puts the cursor in the box that wants
+     the file. */
+  if (!L.is_open && !(L.photo_front && L.photo_back)) {
+    const missing = !L.photo_front ? "front" : "back";
+    const why = L.photo_front || L.photo_back
+      ? `Upload the ${missing} photograph first — sponsors buy the front and the back.`
+      : "Upload a front and a back photograph first.";
+    /* Both surfaces, and they are not the same job. The toast announces that
+       the button did something; the mark on the drop box is what the
+       publisher then acts on, and is the only one of the two that says WHICH
+       box wants a file. */
+    toast(why, "bad");
+    return fail($(`input[type=file]`, $(`.drop[data-side="${missing}"]`)), why);
+  }
   await Store.listings.update(L.id, { is_open: !L.is_open });
   toast(L.is_open ? "Bidding closed." : "Bidding is open.", "ok");
   await refresh();
@@ -1469,11 +2045,7 @@ $("#event-form").addEventListener("submit", async e => {
       confirmed: Number($("#e-confirmed").value) || 0,
       event_date: $("#e-date").value || null,
       venue: $("#e-venue").value.trim(),
-      venue_type: $("#e-venuetype").value.trim(),
-      shooters: $("#e-shooters").value.trim(),
       reach: Number($("#e-reach").value) || 0,
-      hashtag: $("#e-hashtag").value.trim(),
-      press: $("#e-press").value.trim(),
       livestream: $("#e-live").checked,
     });
     toast("Saved.", "ok");
@@ -1507,7 +2079,7 @@ async function startPublishing() {
   const u = Store.auth.current();
   if (u && u.role === "client") { await enterStudio(); return; }
   if (u && u.role === "brand") {
-    toast("This account buys spots. Publishing needs a publisher account.");
+    toast(`This account buys space. Listing a garment needs a ${SIDE.client} account.`);
     return;
   }
   go("auth", { role: "client" });
@@ -1543,17 +2115,17 @@ $("#side-back").addEventListener("click", () => { state.side = "back"; syncSide(
 function syncSide() {
   $("#side-front").setAttribute("aria-pressed", String(state.side === "front"));
   $("#side-back").setAttribute("aria-pressed", String(state.side === "back"));
-  renderGarment();
+  renderGarment(true);
 }
 
 $$("[data-legal]").forEach(a => a.addEventListener("click", e => {
   e.preventDefault();
   const which = a.dataset.legal;
   const copy = {
-    terms: "Square Inch is a marketplace. The publisher owns the garment and decides what goes on it; the brand owns its mark and warrants it has the right to place it. Placement is a licence for the day of the event, not an assignment. We take a platform fee on each settled spot, shown before you bid.",
+    terms: "Square Inch is a marketplace. The wearer owns the garment and decides what goes on it; the sponsor owns its mark and warrants it has the right to place it. Placement is a licence for the day of the event, not an assignment. Our platform fee is charged to the sponsor on top of the settled price, so the settled price is the wearer's in full; the fee is shown before you bid.",
     privacy: "We store your email, your display name, your brand name, your logo and your bidding history. Session cookies are httpOnly and same-site. We do not sell anything to anyone and we do not run third-party analytics. Card details never reach our servers — Stripe holds them.",
     refunds: "Being outbid releases your authorisation in full, automatically, within minutes. If the campaign goal is not reached by the close, every authorisation is released and nobody is charged. Once a spot has settled and been captured, it is refundable only if the event does not take place.",
-    content: "No marks you do not own. Nothing unlawful, hateful, or sexual. No political campaigning. The publisher has the final say on what goes on their own garment and may decline any brand without giving a reason; a declined bid is released in full.",
+    content: "No marks you do not own. Nothing unlawful, hateful, or sexual. No political campaigning. The wearer has the final say on what goes on their own garment and may decline any sponsor without giving a reason; a declined bid is released in full.",
   }[which];
   openSheet({ kicker: "Legal", title: a.textContent, body: `<p class="lead" style="font-size:.93rem">${esc(copy)}</p>` });
 }));
@@ -1617,7 +2189,7 @@ setTimeout(() => $$(".rv").forEach(el => io.observe(el)), 60);
 
 /* redraw the garment when the layout crosses the one-panel / two-panel line */
 window.addEventListener("resize", debounce(() => {
-  if (state.screen === "campaign") renderGarment();
+  if (state.screen === "campaign") renderGarment(true);
 }, 200));
 
 function debounce(fn, ms) {

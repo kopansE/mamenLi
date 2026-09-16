@@ -21,6 +21,7 @@ const Market = require("../public/assets/js/market.js");
 const {
   RULES, settle, nextMinimum, evaluate, commit,
   quote, campaign, countdown, closingTime, extendIfLate, money, raiseOver,
+  areaPercent, priceForBox, validateBox, rateOf, frontMultiplierOf,
 } = Market;
 
 /* ------------------------------------------------------------------ helpers */
@@ -39,7 +40,8 @@ describe("module shape", () => {
   it("exports the documented surface", () => {
     for (const name of ["RULES", "settle", "nextMinimum", "evaluate", "commit",
       "quote", "campaign", "countdown", "closingTime", "extendIfLate",
-      "money", "raiseOver"]) {
+      "money", "raiseOver",
+      "areaPercent", "priceForBox", "validateBox", "rateOf", "frontMultiplierOf"]) {
       assert.ok(name in Market, `missing export: ${name}`);
     }
   });
@@ -49,6 +51,13 @@ describe("module shape", () => {
     assert.equal(RULES.ANTI_SNIPE_MIN, 10);
     assert.equal(RULES.MAX_BID, 1000000);
     assert.equal(RULES.MIN_BID, 1);
+  });
+
+  it("RULES carry the documented area pricing", () => {
+    assert.equal(RULES.RATE_PER_PERCENT, 250);
+    assert.equal(RULES.FRONT_MULTIPLIER, 1.6);
+    assert.equal(RULES.MIN_AREA_PCT, 0.8);
+    assert.equal(RULES.MAX_AREA_PCT, 12);
   });
 
   it("raiseOver beats a price by 15%, rounded up to a whole unit", () => {
@@ -874,5 +883,350 @@ describe("adversarial input", () => {
     const s = settle(sp, [bid("whale", RULES.MAX_BID * 10, T0)]);
     assert.equal(s.holder, "whale");
     assert.equal(s.price, 100);
+  });
+});
+
+/* =========================================================================
+   Priced by the area a brand draws.
+
+   The publisher no longer lays out numbered rectangles and puts a floor under
+   each. A brand drags out the box it wants and the floor follows from how
+   much of the photograph that box covers:
+
+       areaPercent = w * h / 100
+       sideFactor  = front ? front_multiplier : 1
+       floor       = ceil(areaPercent * rate_per_percent * sideFactor)
+
+   Both the page and the server compute it from here, so these tests are the
+   contract between them.
+   ========================================================================= */
+describe("areaPercent", () => {
+  it("reads w and h as percentages of the photograph, so the product needs /100", () => {
+    /* The documented worked example: a 27% x 10% box covers 2.7% of the
+       image, not 270% and not 0.027%. Getting this factor wrong is a
+       hundred-fold price error in either direction. */
+    assert.equal(areaPercent({ w: 27, h: 10 }), 2.7);
+  });
+
+  it("a 10 x 10 box is one percent, and the whole photograph is a hundred", () => {
+    assert.equal(areaPercent({ w: 10, h: 10 }), 1);
+    assert.equal(areaPercent({ w: 100, h: 100 }), 100);
+  });
+
+  it("is symmetric - a tall box and its lying-down twin cost the same cloth", () => {
+    assert.equal(areaPercent({ w: 4, h: 25 }), areaPercent({ w: 25, h: 4 }));
+  });
+
+  it("reads numeric strings, which is what a form and a JSON body actually send", () => {
+    assert.equal(areaPercent({ w: "27", h: "10" }), 2.7);
+  });
+
+  it("is NaN rather than 0 for a box that is not a box", () => {
+    /* 0 would be a free spot. NaN cannot be mistaken for a price, and
+       validateBox refuses it before it can reach a NOT NULL column. */
+    assert.ok(Number.isNaN(areaPercent({})));
+    assert.ok(Number.isNaN(areaPercent(undefined)));
+    assert.ok(Number.isNaN(areaPercent({ w: "wide", h: 10 })));
+  });
+});
+
+/* ========================================================================= */
+describe("rateOf / frontMultiplierOf", () => {
+  it("fall back to the defaults when the listing has not said", () => {
+    assert.equal(rateOf({}), 250);
+    assert.equal(rateOf(null), 250);
+    assert.equal(frontMultiplierOf({}), 1.6);
+    assert.equal(frontMultiplierOf(null), 1.6);
+  });
+
+  it("use what the publisher set", () => {
+    assert.equal(rateOf({ rate_per_percent: 400 }), 400);
+    assert.equal(frontMultiplierOf({ front_multiplier: 2.25 }), 2.25);
+  });
+
+  it("read the numeric strings PostgREST returns for a numeric column", () => {
+    assert.equal(rateOf({ rate_per_percent: "312.50" }), 312.5);
+    assert.equal(frontMultiplierOf({ front_multiplier: "1.20" }), 1.2);
+  });
+
+  it("refuse values the column's own CHECK would refuse", () => {
+    /* The row is owner-writable through PostgREST. A negative rate or a zero
+       multiplier would price the front of a garment at nothing; a string
+       would price it at NaN, which Math.ceil hands straight to the database. */
+    assert.equal(rateOf({ rate_per_percent: -50 }), 250);
+    assert.equal(rateOf({ rate_per_percent: "free" }), 250);
+    assert.equal(frontMultiplierOf({ front_multiplier: 0 }), 1.6);
+    assert.equal(frontMultiplierOf({ front_multiplier: -2 }), 1.6);
+    assert.equal(frontMultiplierOf({ front_multiplier: null }), 1.6);
+  });
+
+  it("a rate of exactly zero is allowed - a publisher may give space away", () => {
+    assert.equal(rateOf({ rate_per_percent: 0 }), 0);
+  });
+
+  it("a NULL column is absent, not zero", () => {
+    /* Number(null) is 0, not NaN. Read with a bare Number(), every listing
+       whose column is still null - which is every listing until the migration
+       runs - priced every box on it at nothing, silently. */
+    assert.equal(Number(null), 0, "this is the trap, pinned so it cannot be forgotten");
+    assert.equal(rateOf({ rate_per_percent: null }), 250);
+    assert.equal(rateOf({ rate_per_percent: undefined }), 250);
+    assert.equal(rateOf({ rate_per_percent: "" }), 250);
+    assert.equal(priceForBox({ side: "front", w: 20, h: 10 }, { rate_per_percent: null }), 800);
+  });
+});
+
+/* ========================================================================= */
+describe("priceForBox", () => {
+  const listing = {};                       // silent: the defaults apply
+
+  it("the documented example: 27% x 10% on the front is 1080", () => {
+    assert.equal(priceForBox({ side: "front", x: 10, y: 20, w: 27, h: 10 }, listing), 1080);
+  });
+
+  it("the same box on the back is the same area without the front multiplier", () => {
+    assert.equal(priceForBox({ side: "back", x: 10, y: 20, w: 27, h: 10 }, listing), 675);
+    assert.equal(675 * 1.6, 1080);
+  });
+
+  it("the front multiplier applies ONLY to the front", () => {
+    const box = { x: 0, y: 0, w: 20, h: 10 };
+    const front = priceForBox(Object.assign({}, box, { side: "front" }), listing);
+    const back = priceForBox(Object.assign({}, box, { side: "back" }), listing);
+    assert.equal(back, 500);
+    assert.equal(front, 800);
+  });
+
+  it("a side that is neither front nor back is priced as a back, never as a front", () => {
+    /* validateBox refuses these outright; this pins that the arithmetic can
+       never be talked into charging the cheap side's rate for the front by
+       leaving the field off. */
+    assert.equal(priceForBox({ side: "FRONT", w: 20, h: 10 }, listing), 500);
+    assert.equal(priceForBox({ w: 20, h: 10 }, listing), 500);
+  });
+
+  it("uses the publisher's own rate and multiplier when the listing carries them", () => {
+    const pricey = { rate_per_percent: 1000, front_multiplier: 2 };
+    assert.equal(priceForBox({ side: "front", w: 10, h: 10 }, pricey), 2000);
+    assert.equal(priceForBox({ side: "back", w: 10, h: 10 }, pricey), 1000);
+  });
+
+  it("scales linearly with area: twice the cloth is twice the money", () => {
+    const one = priceForBox({ side: "back", w: 10, h: 10 }, listing);
+    const two = priceForBox({ side: "back", w: 20, h: 10 }, listing);
+    assert.equal(two, one * 2);
+  });
+
+  it("rounds UP to a whole unit", () => {
+    /* 1% x 1% is 0.01% of the image: 0.01 x 250 = 2.5, and the brand pays 3. */
+    assert.equal(priceForBox({ side: "back", w: 1, h: 1 }, listing), 3);
+  });
+
+  it("does not charge a whole extra unit for float dust", () => {
+    /* A bare Math.ceil charges 56 here: 1 * 50 / 100 * 100 * 1.1 comes out as
+       55.00000000000001 in doubles. Of the 50,000 whole-number boxes on a
+       100x100 grid, 1,601 land a dust mote above their own integer. */
+    const l = { rate_per_percent: 100, front_multiplier: 1.1 };
+    assert.equal(1 * 50 / 100 * 100 * 1.1 > 55, true, "the float dust is real, not imagined");
+    assert.equal(priceForBox({ side: "front", w: 1, h: 50 }, l), 55);
+    assert.equal(priceForBox({ side: "front", w: 1, h: 100 }, l), 110);
+  });
+
+  it("a rate of zero prices at zero rather than at NaN", () => {
+    assert.equal(priceForBox({ side: "front", w: 10, h: 10 }, { rate_per_percent: 0 }), 0);
+  });
+});
+
+/* ========================================================================= */
+describe("validateBox", () => {
+  const listing = {};
+  const ok = (b, existing = []) => validateBox(b, listing, existing);
+  const box = (over = {}) => Object.assign({ side: "front", x: 10, y: 10, w: 10, h: 10 }, over);
+
+  it("accepts an ordinary box with nothing else on that side", () => {
+    assert.deepEqual(ok(box()), { ok: true, reason: null });
+  });
+
+  /* ------------------------------------------------------------- shape */
+  it("refuses anything that is not a rectangle of finite numbers", () => {
+    for (const bad of [null, undefined, {}, { side: "front" },
+      box({ w: "wide" }), box({ x: NaN }), box({ h: Infinity })]) {
+      const v = ok(bad);
+      assert.equal(v.ok, false, `${JSON.stringify(bad)} was accepted`);
+      assert.match(v.reason, /box/i);
+    }
+  });
+
+  it("refuses a zero or negative width or height", () => {
+    /* A tap rather than a drag. Without this a w of -20 passes the area rule
+       on its absolute value and then draws backwards out of the photograph. */
+    for (const bad of [box({ w: 0 }), box({ h: 0 }), box({ w: -20 }), box({ h: -20 })]) {
+      assert.equal(ok(bad).ok, false, `${JSON.stringify(bad)} was accepted`);
+    }
+  });
+
+  /* -------------------------------------------------------------- side */
+  it("refuses a side that is neither front nor back", () => {
+    for (const side of [undefined, null, "", "FRONT", "Front", "sideways", 1, ["front"]]) {
+      const v = ok(box({ side }));
+      assert.equal(v.ok, false, `side ${JSON.stringify(side)} was accepted`);
+      assert.match(v.reason, /front|back/i);
+    }
+  });
+
+  it("the side rule exists because the side is part of the price", () => {
+    /* Dropping the field would otherwise buy the front at the back's rate. */
+    assert.equal(priceForBox(box({ side: undefined }), listing), 250);
+    assert.equal(priceForBox(box({ side: "front" }), listing), 400);
+    assert.equal(ok(box({ side: undefined })).ok, false);
+  });
+
+  /* ------------------------------------------------------------ bounds */
+  it("refuses a box that hangs off any edge", () => {
+    for (const bad of [
+      box({ x: -1 }),                  // off the left
+      box({ y: -0.01 }),               // off the top
+      box({ x: 95, w: 10 }),           // off the right
+      box({ y: 95, h: 10 }),           // off the bottom
+      box({ x: 0, y: 0, w: 101, h: 10 }),
+    ]) {
+      const v = ok(bad);
+      assert.equal(v.ok, false, `${JSON.stringify(bad)} was accepted`);
+      assert.match(v.reason, /inside the photograph/i);
+    }
+  });
+
+  it("accepts a box flush against an edge - 0 and 100 are inside", () => {
+    assert.equal(ok(box({ x: 0, y: 0, w: 10, h: 10 })).ok, true);
+    assert.equal(ok(box({ x: 90, y: 90, w: 10, h: 10 })).ok, true);
+  });
+
+  /* -------------------------------------------------------------- size */
+  it("refuses a box under the minimum area", () => {
+    /* 2 x 2 is 0.04% of the photograph: a logo nobody can see and a price
+       nobody can read on a phone. */
+    const v = ok(box({ w: 2, h: 2 }));
+    assert.equal(v.ok, false);
+    assert.match(v.reason, /too small/i);
+    assert.match(v.reason, /0\.8%/);
+  });
+
+  it("refuses a box over the maximum area", () => {
+    /* 40 x 40 is 16% of the garment - one brand buying the whole front and
+       ending the market before it opens. */
+    const v = ok(box({ x: 0, y: 0, w: 40, h: 40 }));
+    assert.equal(v.ok, false);
+    assert.match(v.reason, /too big/i);
+    assert.match(v.reason, /12%/);
+  });
+
+  it("the limits are inclusive at both ends", () => {
+    assert.equal(areaPercent({ w: 8, h: 10 }), 0.8);
+    assert.equal(ok(box({ w: 8, h: 10 })).ok, true, "exactly the minimum must be allowed");
+    assert.equal(areaPercent({ w: 30, h: 40 }), 12);
+    assert.equal(ok(box({ x: 0, y: 0, w: 30, h: 40 })).ok, true, "exactly the maximum must be allowed");
+  });
+
+  it("a hair under the minimum and a hair over the maximum are refused", () => {
+    assert.equal(ok(box({ w: 7.9, h: 10 })).ok, false);
+    assert.equal(ok(box({ x: 0, y: 0, w: 30.2, h: 40 })).ok, false);
+  });
+
+  /* ----------------------------------------------------------- overlap */
+  const taken = { id: "S-1", n: 3, side: "front", x: 20, y: 20, w: 20, h: 20 };
+
+  it("refuses a box that overlaps a spot already on that side", () => {
+    const v = ok(box({ x: 30, y: 30, w: 20, h: 20 }), [taken]);
+    assert.equal(v.ok, false);
+    assert.match(v.reason, /overlaps spot 3/);
+    assert.match(v.reason, /same cloth/i);
+  });
+
+  it("refuses every direction of overlap, including containment", () => {
+    for (const bad of [
+      { x: 10, y: 10, w: 15, h: 15 },       // clips the top-left corner
+      { x: 35, y: 35, w: 15, h: 15 },       // clips the bottom-right corner
+      { x: 25, y: 25, w: 10, h: 10 },       // entirely inside it
+      { x: 15, y: 15, w: 30, h: 30 },       // entirely around it
+      { x: 15, y: 25, w: 30, h: 10 },       // straight through it
+      { x: 20, y: 20, w: 20, h: 20 },       // exactly on top of it
+    ]) {
+      const v = ok(box(bad), [taken]);
+      assert.equal(v.ok, false, `${JSON.stringify(bad)} was allowed over a taken spot`);
+      assert.match(v.reason, /overlaps/i);
+    }
+  });
+
+  it("allows a box that only SHARES AN EDGE with a taken spot", () => {
+    /* A shared border is zero cloth. Refusing it would make a garment
+       impossible to tile: every neighbour would have to leave a gap. */
+    assert.equal(ok(box({ x: 40, y: 20, w: 20, h: 20 }), [taken]).ok, true, "flush to its right");
+    assert.equal(ok(box({ x: 0, y: 20, w: 20, h: 20 }), [taken]).ok, true, "flush to its left");
+    assert.equal(ok(box({ x: 20, y: 40, w: 20, h: 20 }), [taken]).ok, true, "flush underneath");
+    assert.equal(ok(box({ x: 20, y: 0, w: 20, h: 20 }), [taken]).ok, true, "flush above");
+  });
+
+  it("boxes that merely touch at a corner are neighbours, not a collision", () => {
+    assert.equal(ok(box({ x: 40, y: 40, w: 20, h: 20 }), [taken]).ok, true);
+  });
+
+  it("checks every existing spot, not just the first", () => {
+    const others = [
+      { n: 1, x: 0, y: 0, w: 10, h: 10 },
+      { n: 2, x: 60, y: 60, w: 10, h: 10 },
+      taken,
+    ];
+    const v = ok(box({ x: 30, y: 30, w: 15, h: 15 }), others);
+    assert.equal(v.ok, false);
+    assert.match(v.reason, /spot 3/);
+  });
+
+  it("an UNAPPROVED spot still holds the ground", () => {
+    /* A rectangle another brand drew ten seconds ago is claimed but not yet
+       agreed to. Letting a second brand draw over it means two logos printed
+       on one piece of cloth and one of them refunded after the wedding. */
+    const pending = { id: "S-9", n: 7, approved: false, x: 20, y: 20, w: 20, h: 20 };
+    const v = ok(box({ x: 25, y: 25, w: 10, h: 10 }), [pending]);
+    assert.equal(v.ok, false);
+    assert.match(v.reason, /overlaps spot 7/);
+  });
+
+  it("names the spot generically when the stored row has no number", () => {
+    const v = ok(box({ x: 25, y: 25, w: 10, h: 10 }), [{ x: 20, y: 20, w: 20, h: 20 }]);
+    assert.equal(v.ok, false);
+    assert.match(v.reason, /already taken/i);
+  });
+
+  it("skips stored spots whose own coordinates are unusable", () => {
+    /* A NaN comparison is false in both directions, so an unmeasurable row
+       would silently answer "no overlap" for every box on the garment. It is
+       skipped explicitly instead, and the measurable neighbours still count. */
+    const v = ok(box({ x: 25, y: 25, w: 10, h: 10 }),
+      [{ n: 1, x: null, y: null, w: null, h: null }, taken]);
+    assert.equal(v.ok, false);
+    assert.match(v.reason, /spot 3/);
+  });
+
+  it("tolerates a missing or junk list of existing spots", () => {
+    assert.equal(ok(box(), null).ok, true);
+    assert.equal(ok(box(), undefined).ok, true);
+    assert.equal(ok(box(), []).ok, true);
+  });
+
+  it("re-validating a stored spot against itself is not an overlap", () => {
+    const self = { id: "S-1", side: "front", n: 3, x: 20, y: 20, w: 20, h: 20 };
+    assert.equal(validateBox(self, listing, [taken]).ok, true);
+  });
+
+  it("the rules are checked in the order the person drawing will understand", () => {
+    /* A box that is both off the edge and too big is reported as off the
+       edge: that is the thing they can see themselves doing. */
+    const v = ok(box({ x: 80, y: 0, w: 40, h: 40 }));
+    assert.match(v.reason, /inside the photograph/i);
+  });
+
+  it("answers the documented shape, and nothing else", () => {
+    assert.deepEqual(Object.keys(ok(box())).sort(), ["ok", "reason"]);
+    assert.deepEqual(Object.keys(ok(box({ w: 1, h: 1 }))).sort(), ["ok", "reason"]);
   });
 });

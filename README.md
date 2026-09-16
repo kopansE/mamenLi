@@ -1,23 +1,33 @@
 # Square Inch
 
-A marketplace where someone sells advertising space on their wedding gown or
-suit, and brands bid for the positions that matter.
+Somebody is about to spend a whole day being photographed — a bride, a groom, a
+conference speaker. They post the front and the back of what they are wearing
+and put a price on the fabric. Companies drag a rectangle onto the photograph
+and buy that patch of them.
 
 **`index.html` is the product.** Open that one first.
 
-It is two-sided. The front door asks which side of the table you are on:
+It is two-sided, and the two sides are the **wearer** and the **sponsor**. The
+front door asks which one you are:
 
-- **Brands** go to the directory — every garment taking bids, filterable by
-  gown or suit and by women's or men's — and open the publisher whose room they
-  want to be in.
-- **Publishers** go to the studio, upload a front and a back photograph, drag
-  the spots out on the fabric and set a floor under each one.
+- A **sponsor** goes to the directory — every garment taking bids, filterable by
+  gown or suit and by women's or men's — opens the one whose room it wants to be
+  in, and drags out the patch it wants. The area sets the price.
+- A **wearer** goes to the studio, uploads a front and a back photograph, sets
+  one rate for the fabric, and accepts or declines each sponsor by name.
 
-A publisher's own page is laid out like a campaign, not like a dashboard: a
-headline, the front and the back at full width with every position numbered and
-priced, a funding bar, the list of spots, the one standout spot, social proof,
-how it works, the day itself, perks, who is behind it, and an FAQ. A brand can
-land on it cold and know what it costs by the second screenful.
+Note the roles are stored as `client` and `brand` and always will be: the value
+is frozen by a database trigger the moment an account picks a side, which is
+what stops anybody listing a garment and then bidding on it themselves. Only the
+display words changed. `brand` also still means a company's own mark — the
+"Brand name" field, the `bids.brand` column — and that is a different thing from
+the role.
+
+A wearer's own page is laid out like a campaign, not like a dashboard: a
+headline, the front and the back at full width with every claimed rectangle
+priced on the cloth, a funding bar, what has been taken so far, the rate card,
+social proof, how it works, the day itself, who is behind it, and an FAQ. A
+sponsor can land on it cold and know what it costs by the second screenful.
 
 ---
 
@@ -34,7 +44,7 @@ add a migration, and the traps that already cost us an afternoon.
 ```powershell
 npm run setup     # installs the server's dependencies, once
 npm start         # http://localhost:8787
-npm test          # 273 tests, ~45s
+npm test          # 420 tests, ~110s
 npm run verify    # proves the live database refuses what it should
 ```
 
@@ -267,11 +277,36 @@ The reference this page is modelled on sells spots at a fixed price and lets you
 take one over for double the last sale. Doubling locks everyone out after two
 takeovers, so this runs a real auction instead.
 
-Each spot has a **floor** the publisher sets. A brand states **the most it will
-pay**, and the spot sits at *the least that brand needs to stay ahead* — not at
-their maximum.
+### The sponsor draws the rectangle, and the area sets the floor
 
-- One bidder on a spot pays the **floor**, however high their maximum was.
+There is no menu of positions. A sponsor drags out the patch of fabric it wants,
+anywhere on the front or the back photograph, and the floor under it follows
+from how much of the photograph it covers:
+
+    areaPercent = w * h / 100            // w and h are each a % of the photo
+    sideFactor  = front ? front_multiplier : 1
+    floor       = ceil(areaPercent * rate_per_percent * sideFactor)
+
+The wearer's entire price list is those two numbers. A 27%×10% box on the front
+of a default listing is 2.7% of the image, so 2.7 × 250 × 1.6 = **$1,080**.
+
+A drawn box must cover between **0.8%** and **12%** of the photograph, sit
+inside it, and **not overlap** an existing rectangle — two sponsors cannot print
+on the same cloth. All of that lives in `validateBox`, which the page runs while
+the finger is still moving and the server runs again before it will take money.
+
+A brand-drawn spot arrives **unapproved**. It holds the sponsor's money and
+appears nowhere public until the wearer accepts it; declining releases the
+authorisation in full. The wearer's own page is the only place it shows.
+
+### Then it is an ordinary auction
+
+Once a rectangle exists it is contestable like any other spot. A sponsor states
+**the most it will pay**, and the spot sits at *the least that sponsor needs to
+stay ahead* — not at their maximum.
+
+- One bidder on a spot pays the **floor** — the area price — however high their
+  maximum was.
 - A second bidder over the first takes it, and pays just over the loser's
   maximum.
 - A bidder *under* the leader's ceiling does not win, but **pushes the leader's
@@ -302,6 +337,14 @@ Bidding takes an **authorisation**, not a charge (`capture_method: 'manual'`).
   authorised amount, and that is exactly the shape proxy bidding needs.
 - The campaign misses its goal → every authorisation is released and nobody
   pays.
+- **The wearer never accepted the rectangle** → the authorisation is released at
+  settlement and never captured. Nothing is ever charged for a patch of
+  somebody's clothing they did not agree to.
+- **The wearer declines it** → `POST /api/decline/:spotId` cancels the
+  authorisation *first*, with the secret key, and only then marks the row.
+  Declining is a state, never a delete: `bids.spot_id` is `on delete cascade`,
+  so deleting the spot would delete the bid that carries the payment intent and
+  strand the hold on the sponsor's card with nothing left that knew its id.
 
 The bid sheet shows both numbers side by side, because they are different and
 conflating them would be dishonest: what you'd owe if it closed now, and what is
@@ -323,8 +366,10 @@ suit to her own keynote and a man wears a long coat. The pair decides the
 wording on the card ("Women's gown", "Men's suit"), the two filters in the
 directory, and which silhouette is drawn before a photograph exists.
 
-Each listing has a **front and a back photograph** the publisher uploads. Spots
-are drawn on top by dragging a rectangle across the picture.
+Each listing has a **front and a back photograph** the wearer uploads, and
+**both are required** before bidding can open — a sponsor cannot draw on a
+photograph that is not there. Rectangles are drawn on top by the sponsors
+themselves, not by the wearer.
 
 Coordinates are stored as **percentages of the photograph, never pixels**, so a
 layout drawn on a laptop lands in the same place on a phone, and replacing the
@@ -402,8 +447,9 @@ share sheet on mobile, a pre-filled post on X, a copy-the-link for Instagram
 | `supabase/migrations/` | Tables, RLS, storage policies, realtime, the account triggers. |
 | `supabase/config.toml` | Project ref and CLI settings. |
 | `scripts/verify-supabase.js` | `npm run verify` — proves RLS actually refuses what it should. |
+| `public/assets/garments/` | The demo photographs, front and back, plus `manifest.json` recording where the fabric actually is in each frame. |
 | `public/` | **Everything that is served.** Nothing outside it is reachable over HTTP. |
-| `test/` | 273 tests — `npm test`. Engine, HTTP contract, engine/server parity, browser E2E, and a live Supabase suite that skips itself without keys. |
+| `test/` | 420 tests — `npm test`. Engine, HTTP contract, engine/server parity, browser E2E, and a live Supabase suite that skips itself without keys. |
 | `squareinch.html` | The previous direction: the same product as a square-inch grid. |
 | `app.html`, `demo-*.html` | Earlier studies. |
 

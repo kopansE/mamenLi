@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <title>Square Inch — advertising space, by the spot</title>
-<meta name="description" content="A marketplace for wearable advertising. Publishers put a gown or a suit up with photographs of the front and the back; brands buy the numbered spots on it.">
+<meta name="description" content="Somebody is about to be photographed all day. They post the front and the back of what they are wearing; sponsors draw a rectangle on it and buy that patch of fabric.">
 <meta name="theme-color" content="#FCFBF9">
 
 <!-- Fallback for serving this as a bare static file, where helmet never runs.
@@ -15,7 +15,7 @@
 <!-- sharing -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Square Inch — advertising space, by the spot">
-<meta property="og:description" content="Publishers post the front and the back. Brands buy the numbered spots. The garment gets worn, and your mark is in every photograph taken that day.">
+<meta property="og:description" content="Wearers post the front and the back. Sponsors draw the patch they want and bid on it. The garment gets worn, and your mark is in every photograph taken that day.">
 <meta property="og:image" content="assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 
@@ -35,9 +35,9 @@
     <button class="logo" id="home-link" aria-label="Square Inch — home"><span class="mk"></span>Square&nbsp;Inch</button>
 
     <nav class="navlinks" id="navlinks" aria-label="Sections">
-      <button id="nav-browse">Browse publishers</button>
+      <button id="nav-browse">Browse garments</button>
       <button id="nav-how">How it works</button>
-      <button id="nav-publish">For publishers</button>
+      <button id="nav-publish">For wearers</button>
     </nav>
 
     <div class="navright" id="navright"></div>
@@ -47,9 +47,9 @@
 
   <div class="mobnav" id="mobnav"><div><div class="wrap">
     <nav aria-label="Sections">
-      <button id="mob-browse">Browse publishers</button>
+      <button id="mob-browse">Browse garments</button>
       <button id="mob-how">How it works</button>
-      <button id="mob-publish">For publishers</button>
+      <button id="mob-publish">For wearers</button>
       <div id="mob-account" style="margin-top:16px;display:grid;gap:10px"></div>
     </nav>
   </div></div></div>
@@ -65,9 +65,9 @@
       <div>
         <p class="lbl">Advertising space you can walk around in</p>
         <h1>Walking billboards, <em>by the spot</em></h1>
-        <p class="lead">Somebody is about to spend a whole day being photographed. They post the front
-          and the back of what they are wearing, mark out the positions on the fabric, and put a price
-          on each one. You buy the position you want.</p>
+        <p class="lead">Somebody is about to spend a whole day being photographed. They post the front and
+          the back of what they are wearing and put a price on the fabric. You drag out the patch you want,
+          and what it costs follows how much of them you are covering.</p>
       </div>
 
       <div>
@@ -76,7 +76,7 @@
           <span class="pill live" style="margin-inline-start:auto"><span class="beat"></span> Live</span>
         </div>
         <div class="garment-wrap" id="home-preview"></div>
-        <p class="hint" style="text-align:center;margin-top:12px">Every position numbered and priced, front and back.</p>
+        <p class="hint" style="text-align:center;margin-top:12px">Any rectangle on it, front or back — the size sets the price.</p>
       </div>
     </div>
 
@@ -84,16 +84,16 @@
     <div class="doors">
       <button class="door" id="door-brand">
         <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 9h18M3 9l2-5h14l2 5M3 9v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9M9 13h6"/></svg></span>
-        <h3>I'm a brand</h3>
-        <p>Browse every garment taking bids, pick a numbered spot, upload your mark and pay by card.
-           Outbid before the close and you are refunded in full.</p>
-        <span class="go">Browse publishers</span>
+        <h3>I'm a sponsor</h3>
+        <p>Browse every garment taking bids, drag out the patch of fabric you want, upload your mark and
+           pay by card. Outbid before the close and the hold is released in full.</p>
+        <span class="go">Browse garments</span>
       </button>
       <button class="door" id="door-publisher">
         <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8.6 3.6 5 5.6 6.4 10 8 9.3V20.4h8V9.3l1.6.7L19 5.6l-3.6-2a3.4 3.4 0 0 1-6.8 0Z"/></svg></span>
-        <h3>I'm a publisher</h3>
+        <h3>I'm the one wearing it</h3>
         <p>Upload a photograph of your front and your back — a gown or a suit, women's or men's —
-           draw the spots on the fabric and set a floor for each. Brands come to you.</p>
+           set one rate for the fabric, and approve the sponsors you want on it.</p>
         <span class="go">List my garment</span>
       </button>
     </div>
@@ -105,11 +105,11 @@
       <p class="lbl">Open right now</p>
       <h2>Garments taking bids <em>today</em></h2>
       <p class="lead">Each one is a real day with a real room in it. The numbers under each card are what
-        has been raised so far and how many positions are still unclaimed.</p>
+        has been raised so far, how many sponsors are already on the cloth, and the least a patch costs.</p>
     </div>
     <div class="browse rv" id="home-featured"></div>
     <div style="margin-top:28px">
-      <button class="btn ghost" id="home-seeall">See every publisher</button>
+      <button class="btn ghost" id="home-seeall">See every garment</button>
     </div>
   </section>
 
@@ -121,23 +121,23 @@
     </div>
     <div class="split rv">
       <div>
-        <p class="lbl">If you are a brand</p>
+        <p class="lbl">If you are a sponsor</p>
         <h3 style="margin-top:10px">You are buying a position, not a post</h3>
         <ol>
-          <li>Browse the publishers and open the one whose room you want to be in.</li>
-          <li>Pick a numbered spot on the front or the back. Each one shows what it costs right now.</li>
+          <li>Browse the garments and open the one whose room you want to be in.</li>
+          <li>Drag out the patch of fabric you want, front or back. The price follows the size as you drag.</li>
           <li>Bid your maximum. We bid the least you need to hold it and never more than your number.</li>
-          <li>Upload your mark, pay by card, and it is printed on the garment for the day.</li>
+          <li>Upload your mark and pay by card. The wearer says yes, and it is printed for the day.</li>
         </ol>
       </div>
       <div>
-        <p class="lbl">If you are a publisher</p>
+        <p class="lbl">If you are the one wearing it</p>
         <h3 style="margin-top:10px">Your garment is the only line that can earn</h3>
         <ol>
-          <li>Photograph yourself front and back in what you are going to wear.</li>
-          <li>Drag out the spots on the picture. Fourteen is typical; the front is worth more.</li>
-          <li>Set a floor under each one and a goal for the whole thing.</li>
-          <li>Open the bidding. You are paid out after the day, less the platform fee.</li>
+          <li>Photograph yourself front and back in what you are going to wear. Both are required.</li>
+          <li>Set one rate — what 1% of the garment costs — and how much more the front is worth.</li>
+          <li>Sponsors draw the patch they want. You see exactly where, and accept or decline each one.</li>
+          <li>Open the bidding. You are paid the settled price in full — the sponsor pays our fee on top.</li>
         </ol>
       </div>
     </div>
@@ -160,14 +160,14 @@
   <section class="wrap band">
     <div class="hd">
       <p class="lbl">The directory</p>
-      <h2>Every publisher <em>taking bids</em></h2>
+      <h2>Every garment <em>taking bids</em></h2>
       <p class="lead">Gowns and suits, women's and men's. Open one to see the front, the back and every
         position on it.</p>
     </div>
 
     <div class="filters">
       <div class="fld">
-        <input class="inp" type="search" id="browse-search" placeholder="Search a name, a city or a venue…" aria-label="Search publishers">
+        <input class="inp" type="search" id="browse-search" placeholder="Search a name, a city or a venue…" aria-label="Search garments">
       </div>
       <button class="chip" data-filter="all" aria-pressed="true">Everything</button>
       <button class="chip" data-filter="gown" aria-pressed="false">Gowns</button>
@@ -186,10 +186,10 @@
 
   <!-- hero: words only. The garment gets the whole width to itself below. -->
   <section class="wrap hero">
-    <div class="crumb"><button id="campaign-back">← All publishers</button></div>
+    <div class="crumb"><button id="campaign-back">← All garments</button></div>
     <div class="hero-copy">
       <p class="lbl" id="hero-kicker">Live · closing soon</p>
-      <h1 id="hero-h1">Walking billboard <em>for your brand</em></h1>
+      <h1 id="hero-h1">Walking billboard <em>for your mark</em></h1>
       <p class="lead" id="hero-lead">Your logo on the dress, worn all day, in every photograph taken.</p>
 
       <div class="avatar-line">
@@ -214,7 +214,8 @@
         <button type="button" id="side-front" aria-pressed="true">Front</button>
         <button type="button" id="side-back" aria-pressed="false">Back</button>
       </div>
-      <p class="hint" style="margin-inline:auto">Tap a numbered spot to take it.</p>
+      <button class="btn sm" id="draw-toggle" aria-pressed="false">Draw an area</button>
+      <p class="hint" id="draw-hint" style="margin-inline:auto">Pick the patch of fabric you want — the price follows its size.</p>
       <span class="pill live" id="garment-pill"><span class="beat"></span> Live</span>
     </div>
     <div class="garment-wrap" id="garment-wrap"></div>
@@ -227,9 +228,13 @@
       </div>
       <div class="meter"><i id="goal-bar"></i></div>
       <div class="under">
-        <span><b id="goal-open">0</b> of <b id="goal-total">0</b> spots open</span>
+        <!-- Not "N of M spots open". Under draw-your-own a spot row only exists
+             because a sponsor drew it and bid on it, so the open count is
+             always zero and the line always read "0 of 3 spots open". The id
+             stays because renderCampaign still writes to it. -->
+        <span><b id="goal-total">0</b> <span id="goal-total-word">sponsors on board</span><b id="goal-open" hidden>0</b></span>
         <span>Closes in <b class="num" id="goal-clock">—</b></span>
-        <span id="goal-refund">Refunded in full if the goal is not reached</span>
+        <span id="goal-refund">Every hold is released if the goal is not reached</span>
       </div>
     </div>
   </section>
@@ -237,10 +242,11 @@
   <!-- pick a spot -->
   <section class="wrap band tight" id="spots">
     <div class="hd rv">
-      <p class="lbl">Pick a spot</p>
-      <h2>Every position is numbered, and every one is <em>contestable</em></h2>
-      <p class="lead" id="spots-lead">Each spot has a floor. Bid your maximum and we bid the least you need
-        to hold it — if someone beats you, you are refunded in full and told straight away.</p>
+      <p class="lbl">Taken so far</p>
+      <h2>Every claimed area is still <em>contestable</em></h2>
+      <p class="lead" id="spots-lead">Nobody is handed a menu here. A sponsor drags out the patch of fabric it
+        wants and the size decides the price. Once an area is claimed it stays contestable until the close —
+        bid over the standing price and it is yours, and whoever held it has their hold released in full.</p>
     </div>
     <div class="spotlist rv" id="spotlist"></div>
   </section>
@@ -268,8 +274,8 @@
     </div>
     <div class="steps rv">
       <div class="step">
-        <p class="no">01</p><h3>Pick a spot</h3>
-        <p>Numbered positions across the front and the back. Each one has a fixed place on the fabric and a floor price the publisher set.</p>
+        <p class="no">01</p><h3>Draw your area</h3>
+        <p>Drag a rectangle anywhere on the front or the back. The price follows the area you cover, at the rate the wearer set.</p>
       </div>
       <div class="step">
         <p class="no">02</p><h3>Bid your maximum</h3>
@@ -281,7 +287,7 @@
       </div>
       <div class="step">
         <p class="no">04</p><h3>Get worn</h3>
-        <p>Your mark is printed and worn all day. Photographs, video, the gallery, the recap — your brand is in every one of them.</p>
+        <p>Your mark is printed and worn all day. Every photograph taken that day has it in it.</p>
       </div>
     </div>
   </section>
@@ -295,15 +301,12 @@
   <section class="wrap band tight" id="perks">
     <div class="hd rv">
       <p class="lbl">Sponsor perks</p>
-      <h2>What every sponsor gets</h2>
+      <h2 id="perks-h2">What the wearer is offering</h2>
       <p class="lead">Every spot, from the smallest to the largest. No tiers, no gatekeeping.</p>
     </div>
     <ul class="perks rv">
       <li><span class="tick-i">✓</span><span>Your mark printed on the garment and worn for the whole day</span></li>
-      <li><span class="tick-i">✓</span><span>Three pieces of content: one short video, one long, one post with photographs</span></li>
-      <li><span class="tick-i">✓</span><span>A named mention in the thank-you post, tagging your account</span></li>
-      <li><span class="tick-i">✓</span><span>Your logo in the public gallery for as long as it is up</span></li>
-      <li><span class="tick-i">✓</span><span>Full refund, automatically, the moment somebody outbids you</span></li>
+      <li><span class="tick-i">✓</span><span>Your hold released in full, automatically, the moment somebody outbids you — or if the wearer declines the patch you drew</span></li>
     </ul>
   </section>
 
@@ -321,19 +324,19 @@
     <div class="faq rv">
       <details>
         <summary>What if the spot I want is already taken?</summary>
-        <div class="ans">Take it off them. Every spot stays contestable until it closes: bid more than the standing price plus 15% and it is yours. The brand that held it is refunded in full, automatically, and told it happened. Nothing is locked until the clock runs out.</div>
+        <div class="ans">Take it off them. Every spot stays contestable until it closes: bid more than the standing price plus 15% and it is yours. The sponsor that held it has its hold released in full, automatically. Nothing is locked until the clock runs out.</div>
       </details>
       <details>
         <summary>How does bidding your maximum work?</summary>
-        <div class="ans">You state the most you are willing to pay. The spot then sits at the least you need to hold it — not at your maximum. If someone bids under your ceiling, your price rises just enough to stay ahead and you keep the spot. If someone goes over it, you are outbid and refunded. You are never charged more than the number you typed, and bidding your true ceiling early costs you nothing.</div>
+        <div class="ans">You state the most you are willing to pay. The spot then sits at the least you need to hold it — not at your maximum. If someone bids under your ceiling, your price rises just enough to stay ahead and you keep the spot. If someone goes over it, you are outbid and your hold is released. You are never charged more than the number you typed, and bidding your true ceiling early costs you nothing.</div>
       </details>
       <details>
         <summary>When am I actually charged?</summary>
-        <div class="ans">Your card is authorised when you bid, which places a hold rather than a charge. If you are outbid, the hold is released and nothing is ever taken. If you are still holding the spot when it closes, the hold is captured and you are charged the settled price — which is often less than your maximum.</div>
+        <div class="ans">Your card is authorised when you bid, which places a hold rather than a charge. If you are outbid, the hold is released and nothing is ever taken. If you are still holding the spot when it closes, the hold is captured and you are charged the settled price — which is often less than your maximum. Your bank may take a few days to drop the pending line even though we release it immediately. That is the issuer, not a charge.</div>
       </details>
       <details>
         <summary>What if the goal is not reached?</summary>
-        <div class="ans">Everybody is refunded in full. The goal is the number the publisher needs for the whole thing to be worth printing; below it, the campaign does not run and nobody is charged.</div>
+        <div class="ans">Every hold is released in full. The goal is the number the wearer needs for the whole thing to be worth printing; below it, the campaign does not run and nobody is charged.</div>
       </details>
       <details>
         <summary>Can a bid be sniped in the last second?</summary>
@@ -353,12 +356,16 @@
     <div class="card">
       <p class="lbl">Open an account</p>
       <h2 id="auth-title" style="margin-top:10px">Which side of the <em>table</em>?</h2>
-      <p class="lead" id="auth-lead" style="margin-top:12px">Publishers list a garment. Brands buy the spots on it.</p>
+      <p class="lead" id="auth-lead" style="margin-top:12px">Wearers list a garment. Sponsors buy space on it.</p>
 
       <div class="seg wide" id="role-toggle" role="group" style="margin-top:22px" aria-label="Account type">
-        <button type="button" id="role-client" aria-pressed="true">I'm a publisher</button>
-        <button type="button" id="role-brand" aria-pressed="false">I'm a brand</button>
+        <button type="button" id="role-client" aria-pressed="true">I'm the one wearing it</button>
+        <button type="button" id="role-brand" aria-pressed="false">I'm a sponsor</button>
       </div>
+      <!-- Not a nicety: a database trigger freezes the role on first choice,
+           so somebody who picks the wrong one here needs a second account. -->
+      <p class="hint" id="role-permanent" style="margin-top:10px">This is permanent. It is what stops anyone
+        listing a garment and then bidding on it themselves.</p>
 
       <div id="oauth-block" style="margin-top:22px" hidden>
         <button class="btn ghost wide" id="go-google" type="button">
@@ -378,7 +385,7 @@
         <div class="fld"><label for="au-pw">Password</label>
           <input class="inp" id="au-pw" type="password" autocomplete="current-password" minlength="8" required>
           <p class="hint">At least 8 characters.</p></div>
-        <p class="err" id="auth-err" hidden></p>
+        <p class="err" id="auth-err" role="alert" hidden></p>
         <button class="btn wide" id="auth-go" type="submit">Continue</button>
         <p class="hint" style="text-align:center;margin-top:14px">
           <span id="auth-swap-text">Already have an account?</span>
@@ -400,7 +407,7 @@
         <p class="lead" id="studio-meta" style="margin-top:8px"></p>
       </div>
       <div class="chips">
-        <button class="btn ghost sm" id="studio-view">View as a brand</button>
+        <button class="btn ghost sm" id="studio-view">View as a sponsor</button>
         <button class="btn sm" id="studio-share">Share</button>
       </div>
     </div>
@@ -415,7 +422,7 @@
             <h3>The garment</h3>
             <span class="pill" id="studio-spotcount">0 spots</span>
           </div>
-          <p class="hint" style="margin-bottom:16px">Upload a front and a back photograph, then drag on the picture to mark out a spot. Coordinates are stored as percentages, so they hold on any screen.</p>
+          <p class="hint" style="margin-bottom:16px">Both photographs are required before the bidding can open — sponsors draw the spot they want straight onto them, and they cannot do that on a garment they cannot see.</p>
 
           <div class="row2" style="margin-bottom:18px">
             <div>
@@ -435,16 +442,24 @@
           </div>
 
           <div class="garment-side">
-            <div class="seg" id="studio-side" role="group" aria-label="Which side to edit">
+            <div class="seg" id="studio-side" role="group" aria-label="Which side to view">
               <button type="button" id="studio-front" aria-pressed="true">Front</button>
               <button type="button" id="studio-back-tab" aria-pressed="false">Back</button>
             </div>
-            <div class="chips" style="margin-inline-start:auto">
-              <button class="btn quiet sm" id="studio-draw" aria-pressed="false">Draw a spot</button>
-              <button class="btn quiet sm" id="studio-clear">Clear side</button>
-            </div>
+            <span class="pill" style="margin-inline-start:auto">Sponsors draw their own</span>
           </div>
           <div id="studio-garment"></div>
+        </div>
+
+        <!-- brands waiting on a yes -->
+        <div class="card" id="pending-card" hidden>
+          <div class="card-hd">
+            <h3>Waiting on you</h3>
+            <span class="pill hot" id="pending-count">0</span>
+          </div>
+          <p class="hint" style="margin-bottom:16px">A sponsor has drawn where it wants to be and put money behind it.
+            Nothing is printed until you say yes, and declining releases their card in full.</p>
+          <div id="pending-list"></div>
         </div>
 
         <!-- bids -->
@@ -452,7 +467,7 @@
           <div class="card-hd"><h3>Who bid what</h3><span class="pill" id="studio-bidcount">0 bids</span></div>
           <div class="tbl-scroll">
             <table class="tbl">
-              <thead><tr><th>Brand</th><th>Spot</th><th>Maximum</th><th>Standing</th><th>State</th></tr></thead>
+              <thead><tr><th>Sponsor</th><th>Spot</th><th>Maximum</th><th>Standing</th><th>State</th></tr></thead>
               <tbody id="studio-bids"></tbody>
             </table>
           </div>
@@ -481,9 +496,25 @@
               <div class="fld"><label for="t-city">City</label><input class="inp" id="t-city" type="text"></div>
             </div>
             <div class="row2">
-              <div class="fld"><label for="t-goal">Goal</label><input class="inp num" id="t-goal" type="number" min="0" step="50"></div>
-              <div class="fld"><label for="t-closes">Bidding closes</label><input class="inp" id="t-closes" type="datetime-local"></div>
+              <div class="fld"><label for="t-goal">Goal</label><input class="inp num" id="t-goal" type="number" min="0" step="50">
+                <p class="hint">All or nothing. If bidding closes below this, every card is released and you are
+                  paid nothing — so set it to the least that makes the day worth printing for.</p></div>
+              <!-- Required, and never saved as null: a blank close does not mean
+                   "never closes". The settlement job's `if (!force && closes &&
+                   now < closes)` guard is skipped when closes_at is null, so a
+                   blank field means the next run captures every card at once. -->
+              <div class="fld"><label for="t-closes">Bidding closes <span class="tz" id="t-closes-tz"></span></label>
+                <input class="inp" id="t-closes" type="datetime-local" required></div>
             </div>
+            <div class="row2">
+              <!-- min="1", because a blank rate saved as 0 and every drawn patch
+                   then priced at the $1 floor, whatever its size. -->
+              <div class="fld"><label for="t-rate">Price per 1% of the garment</label>
+                <input class="inp num" id="t-rate" type="number" min="1" step="10" required></div>
+              <div class="fld"><label for="t-frontmul">Front is worth this much more</label>
+                <input class="inp num" id="t-frontmul" type="number" min="1" max="5" step="0.1" required></div>
+            </div>
+            <p class="hint" id="rate-example" style="margin:-4px 0 16px"></p>
             <div class="fld"><label for="t-headline">Headline</label><input class="inp" id="t-headline" type="text" maxlength="90"></div>
             <div class="fld"><label for="t-tagline">One line under it</label><textarea class="inp" id="t-tagline" maxlength="200"></textarea></div>
             <div class="fld"><label for="t-about">About you</label><textarea class="inp" id="t-about" maxlength="600"></textarea></div>
@@ -491,7 +522,7 @@
               <div class="fld"><label for="t-ig">Instagram handle</label><input class="inp" id="t-ig" type="text" placeholder="without the @"></div>
               <div class="fld"><label for="t-tw">X handle</label><input class="inp" id="t-tw" type="text" placeholder="without the @"></div>
             </div>
-            <p class="err" id="terms-err" hidden></p>
+            <p class="err" id="terms-err" role="alert" hidden></p>
             <button class="btn wide" id="terms-save" type="submit">Save</button>
             <button class="btn ghost wide sm" id="terms-open" type="button" style="margin-top:10px">Open the bidding</button>
           </form>
@@ -500,23 +531,17 @@
         <!-- the event -->
         <div class="card">
           <div class="card-hd"><h3>The day itself</h3></div>
-          <p class="hint" style="margin-bottom:16px">Brands cannot decide on vibes. These numbers become the audience estimate on your page.</p>
+          <p class="hint" style="margin-bottom:16px">Sponsors cannot decide on vibes. These numbers become the audience estimate on your page.</p>
           <form id="event-form" novalidate>
             <div class="row2">
               <div class="fld"><label for="e-invited">Invited</label><input class="inp num" id="e-invited" type="number" min="0"></div>
               <div class="fld"><label for="e-confirmed">Confirmed</label><input class="inp num" id="e-confirmed" type="number" min="0"></div>
             </div>
             <div class="fld"><label for="e-date">Date</label><input class="inp" id="e-date" type="date"></div>
-            <div class="row2">
-              <div class="fld"><label for="e-venue">Venue</label><input class="inp" id="e-venue" type="text"></div>
-              <div class="fld"><label for="e-venuetype">Type</label><input class="inp" id="e-venuetype" type="text"></div>
-            </div>
-            <div class="fld"><label for="e-shooters">Who is shooting it</label><input class="inp" id="e-shooters" type="text"></div>
-            <div class="row2">
-              <div class="fld"><label for="e-reach">Combined social reach</label><input class="inp num" id="e-reach" type="number" min="0"></div>
-              <div class="fld"><label for="e-hashtag">Hashtag</label><input class="inp" id="e-hashtag" type="text"></div>
-            </div>
-            <div class="fld"><label for="e-press">Press</label><input class="inp" id="e-press" type="text"></div>
+            <div class="fld"><label for="e-venue">Venue</label><input class="inp" id="e-venue" type="text"></div>
+            <div class="fld"><label for="e-reach">Combined social reach</label>
+              <input class="inp num" id="e-reach" type="number" min="0">
+              <p class="hint">Followers across every account that will post about the day.</p></div>
             <label style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
               <input type="checkbox" id="e-live" style="width:20px;height:20px;accent-color:var(--accent)"> Being livestreamed</label>
             <button class="btn wide" id="event-save" type="submit">Save</button>
@@ -534,14 +559,14 @@
     <div class="cols">
       <div>
         <div class="logo" style="padding:0"><span class="mk"></span>Square&nbsp;Inch</div>
-        <p style="margin-top:12px;max-width:44ch">A marketplace for wearable advertising. Publishers post the
-          front and the back; brands buy the numbered spots. The highest bid holds a spot, whoever is
-          outbid is refunded.</p>
+        <p style="margin-top:12px;max-width:44ch">A marketplace for wearable advertising. Wearers post the
+          front and the back; sponsors draw the patch they want and bid on it. The highest bid holds a
+          patch, and whoever is outbid has their hold released.</p>
         <div class="social" style="margin-top:18px" id="foot-social"></div>
       </div>
       <div class="links">
         <p class="lbl">The market</p>
-        <a href="#" data-nav="browse">Browse publishers</a>
+        <a href="#" data-nav="browse">Browse garments</a>
         <a href="#" data-nav="how">How it works</a>
         <a href="#" data-nav="publish">List a garment</a>
       </div>
@@ -555,7 +580,7 @@
     </div>
     <div class="legal">
       <span id="foot-mode">Demo mode</span>
-      <span>Every brand, bid and figure on this page is invented. No real company is depicted.</span>
+      <span>Every company, bid and figure on this page is invented. No real one is depicted.</span>
     </div>
   </div>
 </footer>

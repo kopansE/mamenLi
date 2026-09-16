@@ -525,3 +525,167 @@ describe("the generator produces a market worth testing", () => {
     assert.ok(held > RUNS * 0.8, `only ${held} of ${RUNS} markets ended up held`);
   });
 });
+
+/* =========================================================================
+   3. The drawn box, priced identically on both sides of the wire
+
+   The brand drags out a rectangle and the page quotes a floor for it while
+   the finger is still moving. The server then recomputes that floor from its
+   own copy of the listing before it writes a spot or takes a card. Those two
+   numbers have to be the same number, every time, or the product is quoting
+   one price and charging another.
+
+   The mechanism is the same one the auction has always relied on: there is
+   one implementation of the arithmetic and both sides require() it. The tests
+   here prove that the server has no second one - no literal rate, no local
+   ceil, no rounding of its own - and that the formula itself is what the
+   README says it is.
+   ========================================================================= */
+describe("a drawn box is priced the same in the browser and on the server", () => {
+  const serverSrc = fs.readFileSync(path.join(ROOT, "server", "index.js"), "utf8");
+
+  it("the server prices a drawn box with the engine and nothing else", () => {
+    assert.match(serverSrc, /Market\.priceForBox\s*\(/,
+      "the server must take the floor from the shared engine; its own multiplication can drift from the page's");
+    assert.match(serverSrc, /Market\.validateBox\s*\(/,
+      "the server must re-run the size and overlap rules itself - the browser's answer is an intent, not a verdict");
+  });
+
+  it("the server never recomputes the price by hand", () => {
+    /* The literals are the giveaway. A `* 250` or a `* 1.6` in server code is
+       a second copy of the price list that nobody will remember to change. */
+    const body = serverSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    assert.ok(!/\b1\.6\b/.test(body), "a front multiplier literal has appeared in the server");
+    assert.ok(!/rate_per_percent\s*\*/.test(body), "the server is multiplying the rate itself");
+    assert.ok(!/\bdraw\.(w|h)\s*\*/.test(body), "the server is computing an area itself");
+  });
+
+  it("the server never takes a price, a floor or an area from the request body", () => {
+    /* "The browser says WHICH spot and WHAT IT IS WILLING TO PAY. It never
+       says what something costs." A drawn box moves the boundary - the
+       browser now says WHERE too - but not the part after the comma. */
+    const body = serverSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    for (const field of ["floor", "price", "area", "areaPercent"]) {
+      assert.ok(!new RegExp(`req\\.body\\.${field}\\b`).test(body), `the server reads req.body.${field}`);
+      assert.ok(!new RegExp(`\\bdraw\\.${field}\\b`).test(body), `the server reads draw.${field}`);
+    }
+  });
+
+  it("the documented worked example holds end to end", () => {
+    /* README: "a 27% x 10% box on the front is 2.7% area -> 2.7 x 250 x 1.6
+       = $1080". If this number ever moves, the documentation is wrong or the
+       engine is. */
+    const listing = { rate_per_percent: 250, front_multiplier: 1.6 };
+    assert.equal(Market.areaPercent({ w: 27, h: 10 }), 2.7);
+    assert.equal(Market.priceForBox({ side: "front", x: 12, y: 30, w: 27, h: 10 }, listing), 1080);
+  });
+
+  it("every box on a 100x100 grid prices identically from both directions", () => {
+    /* One engine, so "both sides" cannot literally be two implementations -
+       what is actually at risk is that the two sides read the LISTING
+       differently. The page has the row from PostgREST, where a numeric
+       column arrives as a string; the server has the same row from the
+       service-role client. A rate of "250.00" and a rate of 250 must price
+       the same, or the quote and the charge differ by a rounding. */
+    const asNumbers = { rate_per_percent: 250, front_multiplier: 1.6 };
+    const asStrings = { rate_per_percent: "250.00", front_multiplier: "1.60" };
+
+    let checked = 0;
+    for (let w = 1; w <= 100; w++) {
+      for (let h = 1; h <= 100; h++) {
+        for (const side of ["front", "back"]) {
+          const box = { side, x: 0, y: 0, w, h };
+          const a = Market.priceForBox(box, asNumbers);
+          const b = Market.priceForBox(box, asStrings);
+          assert.equal(a, b, `a ${w}x${h} box on the ${side} priced ${a} as numbers and ${b} as strings`);
+          checked++;
+        }
+      }
+    }
+    assert.equal(checked, 20000);
+  });
+
+  it("the price is a whole number, never a float the two sides could round apart", () => {
+    const r = rng(90210);
+    const listing = { rate_per_percent: 250, front_multiplier: 1.6 };
+    for (let i = 0; i < 2000; i++) {
+      const w = Math.round(r() * 10000) / 100;
+      const h = Math.round(r() * 10000) / 100;
+      const side = r() < 0.5 ? "front" : "back";
+      const price = Market.priceForBox({ side, x: 0, y: 0, w, h }, listing);
+      assert.equal(price, Math.trunc(price),
+        `a ${w}x${h} box on the ${side} priced at ${price}, which is not a whole unit`);
+      assert.ok(price >= 0, `a ${w}x${h} box priced negative: ${price}`);
+    }
+  });
+
+  it("the front always costs at least as much as the same box on the back", () => {
+    const r = rng(1379);
+    for (let i = 0; i < 1000; i++) {
+      const listing = { rate_per_percent: Math.round(r() * 900) + 1, front_multiplier: 1 + r() * 3 };
+      const box = { x: 0, y: 0, w: Math.round(r() * 99) + 1, h: Math.round(r() * 99) + 1 };
+      const front = Market.priceForBox(Object.assign({ side: "front" }, box), listing);
+      const back = Market.priceForBox(Object.assign({ side: "back" }, box), listing);
+      assert.ok(front >= back,
+        `the front (${front}) came out cheaper than the back (${back}) at x${listing.front_multiplier}`);
+    }
+  });
+
+  it("validateBox and priceForBox agree on what a valid box is worth", () => {
+    /* A box the rules accept must always have a price a card can be charged
+       for: at the 0.8% minimum and the default rate that is 200 on the back,
+       which clears RULES.MIN_BID with room to spare. A validated box that
+       priced under the minimum bid would be accepted by the page and then
+       refused by evaluate() on the server, with nothing the brand could do
+       about it. */
+    const listing = { rate_per_percent: 250, front_multiplier: 1.6 };
+    const r = rng(4242);
+    let accepted = 0;
+    for (let i = 0; i < 4000; i++) {
+      const box = {
+        side: r() < 0.5 ? "front" : "back",
+        x: Math.round(r() * 10000) / 100,
+        y: Math.round(r() * 10000) / 100,
+        w: Math.round(r() * 5000) / 100,
+        h: Math.round(r() * 5000) / 100,
+      };
+      if (!Market.validateBox(box, listing, []).ok) continue;
+      accepted++;
+      const price = Market.priceForBox(box, listing);
+      assert.ok(price >= Market.RULES.MIN_BID,
+        `an accepted ${box.w}x${box.h} box priced at ${price}, under the minimum bid`);
+      /* And the spot it becomes must be biddable: the floor is what
+         nextMinimum answers on a spot nobody has bid on yet. */
+      assert.equal(Market.nextMinimum({ id: "s", floor: price }, []), price);
+    }
+    assert.ok(accepted > 200, `only ${accepted} boxes out of 4000 were ever valid - the sample proves nothing`);
+  });
+
+  it("no valid box can overlap another valid box that was accepted before it", () => {
+    /* Two brands cannot print on the same cloth. Played as a sequence, the
+       way the server plays it: each accepted box joins the list the next one
+       is checked against, and nothing that survives may intersect anything
+       that came earlier. */
+    const listing = { rate_per_percent: 250, front_multiplier: 1.6 };
+    const r = rng(777);
+    for (let seed = 0; seed < 60; seed++) {
+      const placed = [];
+      for (let i = 0; i < 40; i++) {
+        const box = {
+          n: i + 1, side: "front",
+          x: Math.round(r() * 9000) / 100,
+          y: Math.round(r() * 9000) / 100,
+          w: Math.round(r() * 2000) / 100,
+          h: Math.round(r() * 2000) / 100,
+        };
+        if (Market.validateBox(box, listing, placed).ok) placed.push(box);
+      }
+      for (let a = 0; a < placed.length; a++) {
+        for (let b = a + 1; b < placed.length; b++) {
+          assert.ok(!Market.boxesOverlap(placed[a], placed[b]),
+            `spot ${placed[a].n} and spot ${placed[b].n} ended up on the same cloth`);
+        }
+      }
+    }
+  });
+});
