@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Square Inch — sponsor the dress</title>
+<meta name="description" content="A marketplace where a wedding gown or suit sells advertising space by the spot, and brands bid for the ones that matter.">
+<meta name="theme-color" content="#160726">
+
+<!-- Fallback for serving this as a bare static file, where helmet never runs.
+     The server sends a stricter header that supersedes this one. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://api.stripe.com https://*.supabase.co wss://*.supabase.co; frame-src https://js.stripe.com https://hooks.stripe.com; object-src 'none'; base-uri 'self'">
+
+<!-- sharing -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Square Inch — sponsor the dress">
+<meta property="og:description" content="Numbered spots on a wedding gown or suit. Brands bid, the highest rate holds the spot, whoever gets outbid is refunded.">
+<meta property="og:image" content="assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..700&family=Outfit:wght@300..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="assets/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23160726'/><rect x='8' y='8' width='16' height='16' rx='3' fill='%23FF2E93'/></svg>">
+</head>
+<body>
+
+<a class="skip" href="#spots">Skip to the spots</a>
+
+<div class="aura" aria-hidden="true"><i></i><i></i><i></i></div>
+<div class="grain" aria-hidden="true"></div>
+
+<!-- ======================================================== live numbers -->
+<div class="tick" id="tick" role="group" tabindex="0" aria-label="Market at a glance"></div>
+
+<!-- =============================================================== header -->
+<header class="topbar">
+  <div class="wrap bar">
+    <button class="logo" id="home-link" aria-label="Square Inch — home"><span class="mk"></span>Square&nbsp;Inch</button>
+
+    <nav class="navlinks" id="navlinks" aria-label="Sections">
+      <a href="#spots">Pick a spot</a>
+      <a href="#how">How it works</a>
+      <a href="#perks">What you get</a>
+      <a href="#about">About</a>
+      <button id="nav-book">The book</button>
+    </nav>
+
+    <div class="navright" id="navright"></div>
+
+    <button class="burger" id="burger" aria-expanded="false" aria-controls="mobnav" aria-label="Menu"><span></span></button>
+  </div>
+
+  <div class="mobnav" id="mobnav"><div><div class="wrap">
+    <nav aria-label="Sections">
+      <a href="#spots">Pick a spot</a>
+      <a href="#how">How it works</a>
+      <a href="#perks">What you get</a>
+      <a href="#about">About</a>
+      <button id="mob-book">The book</button>
+      <div id="mob-account" style="margin-top:16px;display:grid;gap:10px"></div>
+    </nav>
+  </div></div></div>
+</header>
+
+<!-- ============================================================= campaign -->
+<main id="screen-campaign">
+
+  <!-- hero -->
+  <section class="wrap hero">
+    <div class="hero-grid">
+      <div>
+        <p class="lbl" id="hero-kicker">Live auction · closing soon</p>
+        <h1 id="hero-h1">Walking billboard <span class="grad">for your brand</span></h1>
+        <p class="lead" id="hero-lead">Your logo on the dress, worn all day, in every photograph taken.</p>
+
+        <!-- goal -->
+        <div class="goal" id="goal">
+          <div class="figs">
+            <span class="big num" id="goal-raised">$0</span>
+            <span class="of">raised of <b class="num" id="goal-target">$0</b></span>
+          </div>
+          <div class="meter"><i id="goal-bar"></i></div>
+          <div class="under">
+            <span><b id="goal-open">0</b> of <b id="goal-total">0</b> spots open</span>
+            <span>Closes in <b class="num" id="goal-clock">—</b></span>
+            <span id="goal-refund">Refunded in full if the goal is not reached</span>
+          </div>
+        </div>
+
+        <div class="cta">
+          <a class="btn" href="#spots">Get a spot</a>
+          <button class="btn ghost" id="hero-share">Share this</button>
+        </div>
+      </div>
+
+      <!-- the garment -->
+      <div>
+        <div class="garment-side">
+          <div class="seg seg-side" id="side-toggle" role="group" aria-label="Which side of the garment">
+            <button type="button" id="side-front" aria-pressed="true">Front</button>
+            <button type="button" id="side-back" aria-pressed="false">Back</button>
+          </div>
+          <span class="pill live" id="garment-pill"><span class="beat"></span> Live</span>
+        </div>
+        <div class="garment-wrap" id="garment-wrap"></div>
+        <p class="hint" style="text-align:center;margin-top:12px">Tap a numbered spot to bid on it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- pick a spot -->
+  <section class="wrap band tight" id="spots">
+    <div class="hd rv">
+      <p class="lbl">Pick a spot</p>
+      <h2>Every position is <em style="font-style:italic">numbered</em>, and every one is contestable</h2>
+      <p class="lead" id="spots-lead">Each spot has a floor. Bid your maximum and we bid the least you need to hold it — if someone beats you, you are refunded in full and told straight away.</p>
+    </div>
+    <div class="spotlist rv" id="spotlist"></div>
+  </section>
+
+  <!-- the standout -->
+  <section class="wrap band tight" id="feature-wrap">
+    <div class="feature rv" id="feature"></div>
+  </section>
+
+  <!-- social proof -->
+  <section class="wrap band tight" id="proof">
+    <div class="hd rv">
+      <p class="lbl">Social proof</p>
+      <h2>Already on the <span class="grad">dress</span></h2>
+      <p class="lead">The wall of marks. It fills in live as spots are taken.</p>
+    </div>
+    <div class="wall rv" id="wall"></div>
+  </section>
+
+  <!-- how it works -->
+  <section class="wrap band tight" id="how">
+    <div class="hd rv">
+      <p class="lbl">How it works</p>
+      <h2>Four steps to the <em style="font-style:italic">aisle</em></h2>
+    </div>
+    <div class="steps rv">
+      <div class="step">
+        <p class="no">01</p><h3>Pick a spot</h3>
+        <p>Numbered positions across the front and the back. Each one has a fixed place on the fabric and a floor price the publisher set.</p>
+      </div>
+      <div class="step">
+        <p class="no">02</p><h3>Bid your maximum</h3>
+        <p>State the most you would pay. We bid the least needed to hold the spot and only go higher if someone pushes you.</p>
+      </div>
+      <div class="step">
+        <p class="no">03</p><h3>Pay by card</h3>
+        <p>Stripe takes the card on its own hosted page — the details never touch this site. Outbid before close and the hold is released.</p>
+      </div>
+      <div class="step">
+        <p class="no">04</p><h3>Get worn</h3>
+        <p>Your mark is printed and worn all day. Photographs, video, the gallery, the recap — your brand is in every one of them.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- the event -->
+  <section class="wrap band tight">
+    <div class="card rv" id="event-card"></div>
+  </section>
+
+  <!-- perks -->
+  <section class="wrap band tight" id="perks">
+    <div class="hd rv">
+      <p class="lbl">Sponsor perks</p>
+      <h2>What every sponsor gets</h2>
+      <p class="lead">Every spot, from the smallest to the largest. No tiers, no gatekeeping.</p>
+    </div>
+    <ul class="perks rv">
+      <li><span class="tick-i">✓</span><span>Your mark printed on the garment and worn for the whole day</span></li>
+      <li><span class="tick-i">✓</span><span>Three pieces of content: one short video, one long, one post with photographs</span></li>
+      <li><span class="tick-i">✓</span><span>A named mention in the thank-you post, tagging your account</span></li>
+      <li><span class="tick-i">✓</span><span>Your logo in the public gallery for as long as it is up</span></li>
+      <li><span class="tick-i">✓</span><span>Full refund, automatically, the moment somebody outbids you</span></li>
+    </ul>
+  </section>
+
+  <!-- about -->
+  <section class="wrap band tight" id="about">
+    <div class="card about rv" id="about-card"></div>
+  </section>
+
+  <!-- faq -->
+  <section class="wrap band tight" id="faq">
+    <div class="hd rv">
+      <p class="lbl">FAQ</p>
+      <h2>Questions, answered</h2>
+    </div>
+    <div class="faq rv">
+      <details>
+        <summary>What if the spot I want is already taken?</summary>
+        <div class="ans">Take it off them. Every spot stays contestable until it closes: bid more than the standing price plus 15% and it is yours. The brand that held it is refunded in full, automatically, and told it happened. Nothing is locked until the clock runs out.</div>
+      </details>
+      <details>
+        <summary>How does bidding your maximum work?</summary>
+        <div class="ans">You state the most you are willing to pay. The spot then sits at the least you need to hold it — not at your maximum. If someone bids under your ceiling, your price rises just enough to stay ahead and you keep the spot. If someone goes over it, you are outbid and refunded. You are never charged more than the number you typed, and bidding your true ceiling early costs you nothing.</div>
+      </details>
+      <details>
+        <summary>When am I actually charged?</summary>
+        <div class="ans">Your card is authorised when you bid, which places a hold rather than a charge. If you are outbid, the hold is released and nothing is ever taken. If you are still holding the spot when it closes, the hold is captured and you are charged the settled price — which is often less than your maximum.</div>
+      </details>
+      <details>
+        <summary>What if the goal is not reached?</summary>
+        <div class="ans">Everybody is refunded in full. The goal is the number the publisher needs for the whole thing to be worth printing; below it, the campaign does not run and nobody is charged.</div>
+      </details>
+      <details>
+        <summary>Can a bid be sniped in the last second?</summary>
+        <div class="ans">No. Any bid inside the final ten minutes pushes that spot's close out by ten minutes. A spot only closes once nobody has bid for ten clear minutes, so the last bid is always one somebody had a chance to answer.</div>
+      </details>
+      <details>
+        <summary>What format does my logo need to be?</summary>
+        <div class="ans">SVG or a PNG on transparency, at least 1000px on the long edge. Solid single-colour marks print best on fabric. Upload it when you bid and it appears on the garment straight away.</div>
+      </details>
+    </div>
+  </section>
+</main>
+
+<!-- ================================================================= book -->
+<main id="screen-book" hidden>
+  <section class="wrap band">
+    <div class="crumb"><button id="book-back">← Back</button></div>
+    <div class="hd">
+      <p class="lbl">The book</p>
+      <h2>Every garment <span class="grad">open</span> right now</h2>
+    </div>
+    <div class="fld" style="max-width:420px">
+      <input class="inp" type="search" id="book-search" placeholder="Search a name, a city or a brand…" aria-label="Search listings">
+    </div>
+    <div class="browse" id="book-grid"></div>
+  </section>
+</main>
+
+<!-- ================================================================= auth -->
+<main id="screen-auth" hidden>
+  <section class="wrap narrow band">
+    <div class="card">
+      <p class="lbl">Open an account</p>
+      <h2 id="auth-title" style="margin-top:10px">Which side of the table?</h2>
+      <p class="lead" id="auth-lead" style="margin-top:12px">Publishers list a garment. Brands bid on the spots.</p>
+
+      <div class="seg" id="role-toggle" role="group" style="margin-top:22px" aria-label="Account type">
+        <button type="button" id="role-client" aria-pressed="true">It's my garment</button>
+        <button type="button" id="role-brand" aria-pressed="false">I'm buying</button>
+      </div>
+
+      <div id="oauth-block" style="margin-top:22px" hidden>
+        <button class="btn ghost wide" id="go-google" type="button">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-5 3.4-8.6Z"/><path fill="#34A853" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.7H1.8v3A11.5 11.5 0 0 0 12 24Z"/><path fill="#FBBC05" d="M5.6 14.7a6.9 6.9 0 0 1 0-4.4v-3H1.8a11.5 11.5 0 0 0 0 10.4l3.8-3Z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.2.6 4.4 1.7l3.3-3.3A11.5 11.5 0 0 0 1.8 7.3l3.8 3C6.5 6.8 9 4.8 12 4.8Z"/></svg>
+          <span>Continue with Google</span>
+        </button>
+        <p class="lbl" style="text-align:center;margin:18px 0 4px">or with an email</p>
+      </div>
+
+      <form id="auth-form" style="margin-top:24px" novalidate>
+        <div class="fld"><label for="au-name" id="au-name-label">Your name</label>
+          <input class="inp" id="au-name" type="text" autocomplete="name" required></div>
+        <div class="fld" id="au-brand-fld" hidden><label for="au-brand">Brand name</label>
+          <input class="inp" id="au-brand" type="text" autocomplete="organization"></div>
+        <div class="fld"><label for="au-email">Email</label>
+          <input class="inp" id="au-email" type="email" autocomplete="email" required></div>
+        <div class="fld"><label for="au-pw">Password</label>
+          <input class="inp" id="au-pw" type="password" autocomplete="current-password" minlength="8" required>
+          <p class="hint">At least 8 characters.</p></div>
+        <p class="err" id="auth-err" hidden></p>
+        <button class="btn wide" id="auth-go" type="submit">Continue</button>
+        <p class="hint" style="text-align:center;margin-top:14px">
+          <span id="auth-swap-text">Already have an account?</span>
+          <button type="button" id="auth-toggle" style="color:var(--magenta)">Sign in</button>
+        </p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<!-- =============================================================== studio -->
+<main id="screen-studio" hidden>
+  <section class="wrap band">
+    <div class="crumb"><button id="studio-back">← Back to the page</button></div>
+    <div class="card-hd" style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:22px">
+      <div style="margin-inline-end:auto">
+        <p class="lbl">Your listing</p>
+        <h2 id="studio-names" style="margin-top:8px">—</h2>
+        <p class="lead" id="studio-meta" style="margin-top:8px"></p>
+      </div>
+      <div class="chips">
+        <button class="btn ghost sm" id="studio-view">View as a buyer</button>
+        <button class="btn sm" id="studio-share">Share</button>
+      </div>
+    </div>
+
+    <div class="stats" id="studio-stats"></div>
+
+    <div class="studio-grid">
+      <div style="display:grid;gap:20px">
+        <!-- photos + spot editor -->
+        <div class="card">
+          <div class="card-hd">
+            <h3>The garment</h3>
+            <span class="pill" id="studio-spotcount">0 spots</span>
+          </div>
+          <p class="hint" style="margin-bottom:16px">Upload a front and a back photograph, then drag on the picture to mark out a spot. Coordinates are stored as percentages, so they hold on any screen.</p>
+
+          <div class="row2" style="margin-bottom:18px">
+            <div>
+              <label class="lbl" style="display:block;margin-bottom:8px">Front photograph</label>
+              <div class="drop" data-side="front">
+                <input type="file" accept="image/*" aria-label="Upload the front photograph">
+                <p class="big">Drop a photo</p><p class="small">or tap to choose · JPG or PNG · up to 8MB</p>
+              </div>
+            </div>
+            <div>
+              <label class="lbl" style="display:block;margin-bottom:8px">Back photograph</label>
+              <div class="drop" data-side="back">
+                <input type="file" accept="image/*" aria-label="Upload the back photograph">
+                <p class="big">Drop a photo</p><p class="small">or tap to choose · JPG or PNG · up to 8MB</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="garment-side">
+            <div class="seg" id="studio-side" role="group" aria-label="Which side to edit">
+              <button type="button" id="studio-front" aria-pressed="true">Front</button>
+              <button type="button" id="studio-back-tab" aria-pressed="false">Back</button>
+            </div>
+            <div class="chips">
+              <button class="btn quiet sm" id="studio-draw" aria-pressed="false">Draw a spot</button>
+              <button class="btn quiet sm" id="studio-clear">Clear side</button>
+            </div>
+          </div>
+          <div id="studio-garment"></div>
+        </div>
+
+        <!-- bids -->
+        <div class="card">
+          <div class="card-hd"><h3>Who bid what</h3><span class="pill" id="studio-bidcount">0 bids</span></div>
+          <div class="tbl-scroll">
+            <table class="tbl">
+              <thead><tr><th>Brand</th><th>Spot</th><th>Maximum</th><th>Standing</th><th>State</th></tr></thead>
+              <tbody id="studio-bids"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;gap:20px">
+        <!-- terms -->
+        <div class="card">
+          <div class="card-hd"><h3>Your terms</h3></div>
+          <form id="terms-form" novalidate>
+            <div class="fld"><label for="t-garment">Garment</label>
+              <select class="inp" id="t-garment">
+                <option value="gown">Gown</option>
+                <option value="suit">Suit</option>
+              </select></div>
+            <div class="row2">
+              <div class="fld"><label for="t-names">Names</label><input class="inp" id="t-names" type="text"></div>
+              <div class="fld"><label for="t-city">City</label><input class="inp" id="t-city" type="text"></div>
+            </div>
+            <div class="row2">
+              <div class="fld"><label for="t-goal">Goal</label><input class="inp num" id="t-goal" type="number" min="0" step="50"></div>
+              <div class="fld"><label for="t-closes">Bidding closes</label><input class="inp" id="t-closes" type="datetime-local"></div>
+            </div>
+            <div class="fld"><label for="t-headline">Headline</label><input class="inp" id="t-headline" type="text" maxlength="90"></div>
+            <div class="fld"><label for="t-tagline">One line under it</label><textarea class="inp" id="t-tagline" maxlength="200"></textarea></div>
+            <div class="fld"><label for="t-about">About you</label><textarea class="inp" id="t-about" maxlength="600"></textarea></div>
+            <div class="row2">
+              <div class="fld"><label for="t-ig">Instagram handle</label><input class="inp" id="t-ig" type="text" placeholder="without the @"></div>
+              <div class="fld"><label for="t-tw">X handle</label><input class="inp" id="t-tw" type="text" placeholder="without the @"></div>
+            </div>
+            <p class="err" id="terms-err" hidden></p>
+            <button class="btn wide" id="terms-save" type="submit">Save</button>
+            <button class="btn ghost wide sm" id="terms-open" type="button" style="margin-top:10px">Open the bidding</button>
+          </form>
+        </div>
+
+        <!-- the event -->
+        <div class="card">
+          <div class="card-hd"><h3>The day itself</h3></div>
+          <p class="hint" style="margin-bottom:16px">Brands cannot decide on vibes. These numbers become the audience estimate on your page.</p>
+          <form id="event-form" novalidate>
+            <div class="row2">
+              <div class="fld"><label for="e-invited">Invited</label><input class="inp num" id="e-invited" type="number" min="0"></div>
+              <div class="fld"><label for="e-confirmed">Confirmed</label><input class="inp num" id="e-confirmed" type="number" min="0"></div>
+            </div>
+            <div class="fld"><label for="e-date">Date</label><input class="inp" id="e-date" type="date"></div>
+            <div class="row2">
+              <div class="fld"><label for="e-venue">Venue</label><input class="inp" id="e-venue" type="text"></div>
+              <div class="fld"><label for="e-venuetype">Type</label><input class="inp" id="e-venuetype" type="text"></div>
+            </div>
+            <div class="fld"><label for="e-shooters">Who is shooting it</label><input class="inp" id="e-shooters" type="text"></div>
+            <div class="row2">
+              <div class="fld"><label for="e-reach">Combined social reach</label><input class="inp num" id="e-reach" type="number" min="0"></div>
+              <div class="fld"><label for="e-hashtag">Hashtag</label><input class="inp" id="e-hashtag" type="text"></div>
+            </div>
+            <div class="fld"><label for="e-press">Press</label><input class="inp" id="e-press" type="text"></div>
+            <label style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
+              <input type="checkbox" id="e-live" style="width:20px;height:20px;accent-color:var(--magenta)"> Being livestreamed</label>
+            <button class="btn wide" id="event-save" type="submit">Save</button>
+          </form>
+          <div id="audience-out" style="margin-top:18px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- =============================================================== footer -->
+<footer class="foot">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <div class="logo" style="padding:0"><span class="mk"></span>Square&nbsp;Inch</div>
+        <p style="margin-top:12px;max-width:44ch">Numbered spots on a wedding gown or a suit. Brands bid, the highest holds it, whoever is outbid is refunded. That is the whole product.</p>
+        <div class="social" style="margin-top:18px" id="foot-social"></div>
+      </div>
+      <div class="links">
+        <p class="lbl">The market</p>
+        <a href="#spots">Pick a spot</a>
+        <a href="#how">How it works</a>
+        <a href="#perks">What you get</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div class="links">
+        <p class="lbl">Legal</p>
+        <a href="#" data-legal="terms">Terms</a>
+        <a href="#" data-legal="privacy">Privacy</a>
+        <a href="#" data-legal="refunds">Refund policy</a>
+        <a href="#" data-legal="content">Content policy</a>
+      </div>
+    </div>
+    <div class="legal">
+      <span id="foot-mode">Demo mode</span>
+      <span>Every brand, bid and figure on this page is invented. No real company is depicted.</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ======================================================== mobile action -->
+<div class="actionbar" id="actionbar">
+  <div class="info">
+    <div class="k" id="ab-k">Selected</div>
+    <div class="v" id="ab-v">—</div>
+  </div>
+  <button class="btn" id="ab-go">Bid</button>
+</div>
+
+<!-- ================================================================ sheets -->
+<div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+  <div class="sheet" id="sheet">
+    <div class="grip"></div>
+    <div class="sheet-hd">
+      <div>
+        <p class="lbl" id="sheet-kicker"></p>
+        <h3 id="sheet-title" style="margin-top:6px">—</h3>
+      </div>
+      <button class="x" id="sheet-x" aria-label="Close">✕</button>
+    </div>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="assets/js/market.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/app.js" type="module"></script>
+</body>
+</html>

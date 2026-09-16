@@ -4,3 +4,6 @@ node_modules/
 .env
 .env.local
 assets/gown.glb
+
+# supabase CLI scratch
+supabase/.temp/

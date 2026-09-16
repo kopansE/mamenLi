@@ -1,0 +1,70 @@
+# Deploy to Render: connect the repo, and this file configures the service.
+#
+# The app is ONE process. server/index.js serves public/ and /api together, so
+# there is nothing to split and no build step to run on the front end. That is
+# also why it does not go on a static host: the Stripe secret and the price
+# validation have to live somewhere that is not the browser.
+#
+# Every secret below is `sync: false`, which means Render prompts for it and
+# stores it in the service's own environment. None of them are in this file and
+# none of them are in the repo - .env is gitignored and stays that way.
+
+services:
+  - type: web
+    name: square-inch
+    runtime: node
+    region: frankfurt          # nearest to Tel Aviv of Render's regions
+    plan: starter              # see the note about the free plan below
+
+    buildCommand: npm ci --omit=dev && npm --prefix server ci --omit=dev
+    startCommand: node server/index.js
+
+    healthCheckPath: /healthz
+
+    envVars:
+      - key: NODE_ENV
+        value: production      # turns on HSTS and marks cookies Secure
+
+      - key: TRUST_PROXY
+        value: "1"             # Render terminates TLS in front of us: exactly one proxy
+
+      - key: PUBLIC_BASE_URL
+        value: https://mimonim.com
+
+      - key: CANONICAL_HOST
+        value: mimonim.com     # www and the .onrender.com host 308 here
+
+      - key: PLATFORM_FEE_PERCENT
+        value: "8"
+
+      - key: CURRENCY
+        value: usd
+
+      # ---- secrets: entered in the Render dashboard, never committed --------
+      - key: SUPABASE_URL
+        value: https://zhwathzwrqxzgizanabn.supabase.co
+      - key: SUPABASE_ANON_KEY
+        sync: false            # safe in a browser, but still not in git
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false            # bypasses RLS - the one that must never leak
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: SETTLE_SECRET
+        sync: false
+
+# ---------------------------------------------------------------------------
+# On the plan: Render's free tier spins a service down after 15 minutes idle,
+# and the next request pays a ~50 second cold start. For a site running live
+# auctions with a countdown on screen, that is not a trade worth making - the
+# first visitor of the morning watches a blank page for a minute. `starter` is
+# $7/month and stays warm. Drop to `free` only while nothing real is running.
+#
+# Also: this service does NOT close listings by itself. Settlement is
+# POST /api/settle/:listingId guarded by SETTLE_SECRET. Add a Render Cron Job
+# (or a GitHub Action) that calls it when a listing is due to close, or the
+# winners are never captured.
+# ---------------------------------------------------------------------------

@@ -1,0 +1,22 @@
+# Supabase project configuration.
+#
+# `project_id` is the ref from the dashboard URL:
+#   https://supabase.com/dashboard/project/zhwathzwrqxzgizanabn
+#
+# With the GitHub integration enabled, everything in supabase/migrations is
+# applied in filename order when the production branch is pushed. Never edit a
+# migration that has already run - add a new one.
+project_id = "zhwathzwrqxzgizanabn"
+
+[db]
+major_version = 15
+
+[auth]
+# Flip this to true once you have an email provider wired up and want real
+# confirmations. With it false, sign-ups are usable immediately, which is what
+# the app's onboarding assumes.
+enable_confirmations = false
+
+[storage]
+# Garment photographs are capped at 8MB by the client; logos at 2MB.
+file_size_limit = "8MiB"
