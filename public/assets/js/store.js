@@ -189,7 +189,24 @@ window.Store = (function () {
     ];
 
     const day = n => new Date(Date.now() + n * 86400000).toISOString();
-    const listings = {}, spots = {}, bids = {};
+    /* PostgREST answers an update that matched NOTHING with "Cannot coerce the
+     result to a single JSON object", because `.single()` got zero rows rather
+     than one. That string is true and completely useless to the person reading
+     it. Under RLS there are only two ways to match nothing: the row is gone,
+     or the policy refused you - and the overwhelmingly common cause of the
+     second is a session that has quietly expired, which the page otherwise has
+     no way to tell anyone about. The original stays on the console for us. */
+  function rowError(error, what) {
+    if (/coerce the result to a single json object/i.test(error.message || "")) {
+      console.warn("PostgREST matched no row:", error.message);
+      return new Error(
+        `That ${what} could not be changed — your session may have expired. ` +
+        `Sign out and back in, and nothing you have already saved is affected.`);
+    }
+    return new Error(error.message);
+  }
+
+  const listings = {}, spots = {}, bids = {};
 
     for (const P of PEOPLE) {
       const listing = {
@@ -418,7 +435,7 @@ window.Store = (function () {
     async update(id, patch) {
       if (mode === "supabase") {
         const { data, error } = await sb.from("listings").update(patch).eq("id", id).select().single();
-        if (error) throw new Error(error.message);
+        if (error) throw rowError(error, "listing");
         return data;
       }
       const d = db();
@@ -457,7 +474,7 @@ window.Store = (function () {
     async update(id, patch) {
       if (mode === "supabase") {
         const { data, error } = await sb.from("spots").update(patch).eq("id", id).select().single();
-        if (error) throw new Error(error.message);
+        if (error) throw rowError(error, "spot");
         return data;
       }
       const d = db(); Object.assign(d.spots[id], patch); save(d);
