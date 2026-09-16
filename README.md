@@ -13,6 +13,14 @@ screenful.
 
 ---
 
+## Operating it
+
+[OPERATIONS.md](OPERATIONS.md) is the runbook: every account and identifier,
+where each credential lives, how to deploy, how to change the domain, how to
+add a migration, and the traps that already cost us an afternoon.
+
+---
+
 ## Run it
 
 ```powershell

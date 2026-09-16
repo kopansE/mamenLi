@@ -7,3 +7,5 @@ assets/gown.glb
 
 # supabase CLI scratch
 supabase/.temp/
+
+render-env.txt
