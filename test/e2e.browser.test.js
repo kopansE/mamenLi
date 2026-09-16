@@ -495,6 +495,111 @@ describe("the page in a real browser", SUITE_OPTS, () => {
       assert.equal(signIn.cta, "Sign in", `the form still offers to "${signIn.cta}"`);
       assert.equal(signIn.roleHidden, true, "signing in must not offer to change which side you are on");
     });
+
+    /* ------------------------------------------------------------ the showcase
+       The front door has to answer "what is this?" before anybody reads a word,
+       and the only answer that works is a photograph of a person with somebody
+       else's logo printed on them. */
+    it("shows a front and a back of the same person with sponsors on the cloth, men first", async () => {
+      const page = await open({ screen: "home" });
+      const m = await page.evaluate(`
+        await new Promise(r => setTimeout(r, 700));
+        const shots = [...document.querySelectorAll(".showcase .shot img")];
+        return {
+          men: document.getElementById("show-male").getAttribute("aria-pressed"),
+          women: document.getElementById("show-female").getAttribute("aria-pressed"),
+          srcs: shots.map(i => i.getAttribute("src")),
+          complete: shots.map(i => i.complete && i.naturalWidth > 0),
+          marks: [...document.querySelectorAll(".showcase .mark b")].map(b => b.textContent),
+          caption: document.getElementById("show-caption").textContent,
+          dots: document.querySelectorAll("#show-dots [data-show]").length,
+        };
+      `);
+
+      assert.equal(m.men, "true", "the men's tab is the default and was not selected");
+      assert.equal(m.women, "false");
+      assert.equal(m.srcs.length, 2, "the showcase is a PAIR - one person, front and back");
+
+      /* Both halves must be the same person. A front of one and a back of
+         another is the one mistake this component can make that nobody
+         notices in review and everybody notices on the page. */
+      const who = m.srcs.map(s => (s.match(/\/(p\d)-/) || [])[1]);
+      assert.equal(who[0], who[1], `the pair shows ${who[0]} and ${who[1]}, which are two different people`);
+      assert.match(m.srcs[0], /-front\.jpg$/);
+      assert.match(m.srcs[1], /-back\.jpg$/);
+
+      /* The photographs have to have actually loaded. A broken path here is a
+         front door with two empty rectangles on it. */
+      assert.deepEqual(m.complete, [true, true], "a showcase photograph did not load");
+
+      assert.equal(m.marks.length, 2, "the point of the picture is the logo on the cloth");
+      assert.ok(m.marks.every(t => t.trim().length), "a sponsor mark rendered with no name in it");
+      assert.match(m.caption, /·/, "the caption should name who this is and where");
+      assert.ok(m.dots >= 2, "there is more than one man to show, so there should be dots");
+
+      assert.deepEqual(page.errors(), [], page.consoleText());
+    });
+
+    it("moves on by itself, and the women's tab shows women", async () => {
+      const page = await open({ screen: "home" });
+      const m = await page.evaluate(`
+        await new Promise(r => setTimeout(r, 700));
+        const first = document.querySelector(".showcase .shot img").getAttribute("src");
+
+        /* The rotation is on a 3s timer. Wait it out rather than reaching in,
+           because the thing under test is that it happens without being asked. */
+        await new Promise(r => setTimeout(r, 3600));
+        const second = document.querySelector(".showcase .shot img").getAttribute("src");
+
+        document.getElementById("show-female").click();
+        await new Promise(r => setTimeout(r, 400));
+        const women = [...document.querySelectorAll(".showcase .shot img")]
+          .map(i => i.getAttribute("src"));
+        return { first, second, women,
+                 pressed: document.getElementById("show-female").getAttribute("aria-pressed") };
+      `);
+
+      assert.notEqual(m.second, m.first, "the showcase never advanced on its own");
+      assert.equal(m.pressed, "true");
+
+      /* p1-p3 are the women in the set and p4-p5 the men. Switching tabs has to
+         actually change who is on screen, not just which button looks pressed. */
+      for (const src of m.women) {
+        assert.match(src, /\/p[123]-/, `the women's tab is showing ${src}`);
+      }
+      assert.deepEqual(page.errors(), [], page.consoleText());
+    });
+
+    /* ------------------------------------------------------- a slow boot
+       Twice now this page has been reported as "blank". Both times the cause
+       was the same: every screen ships hidden and boot decides which to show,
+       so anything that stalls boot - a sleeping free-tier dyno takes the better
+       part of a minute to wake - renders a header, a footer, and nothing at
+       all in between, with no error a reader can see. */
+    it("still shows the front door when the config request never answers", async () => {
+      const page = await browser.newPage({ width: 1280, height: 900 });
+      openPages.push(page);
+      await page.clearStorage(ORIGIN);
+      await page.send("Network.setBlockedURLs", { urls: ["*/api/config"] });
+      await page.send("Page.navigate", { url: ORIGIN + "/" });
+      await new Promise(r => setTimeout(r, 4000));
+
+      const m = await page.evaluate(`
+        const home = document.getElementById("screen-home");
+        return {
+          homeVisible: !home.hidden,
+          headline: (document.querySelector("#screen-home h1") || {}).textContent || "",
+          doors: document.querySelectorAll(".door").length,
+          photos: document.querySelectorAll(".showcase .shot img").length,
+        };
+      `);
+
+      assert.ok(m.homeVisible, "the front door was hidden, so the page rendered as blank");
+      assert.match(m.headline, /\S/, "there was no headline on screen");
+      assert.equal(m.doors, 2, "neither door was reachable");
+      assert.equal(m.photos, 2,
+        "the showcase is drawn from constants, not the network, so it must survive this");
+    });
   });
 
   /* ==================================================================== */

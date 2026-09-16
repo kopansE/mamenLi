@@ -58,7 +58,13 @@
 <div id="main"></div>
 
 <!-- ========================================================== the front door -->
-<main id="screen-home" hidden>
+<!-- Not hidden. Every other screen is, and the boot function decides which one
+     to show - but if boot is slow (a sleeping free-tier dyno takes the better
+     part of a minute to wake) or throws, a page where EVERY screen starts
+     hidden renders a header, a footer and nothing whatsoever in between, with
+     no error anybody can see. The front door is the default, so it is the
+     default in the markup too. -->
+<main id="screen-home">
 
   <section class="wrap hero">
     <div class="hero-grid">
@@ -72,11 +78,19 @@
 
       <div>
         <div class="garment-side">
-          <span class="lbl">What a listing looks like</span>
-          <span class="pill live" style="margin-inline-start:auto"><span class="beat"></span> Live</span>
+          <div class="seg" id="show-tabs" role="group" aria-label="Whose garment to show">
+            <button type="button" id="show-male" aria-pressed="true">Men</button>
+            <button type="button" id="show-female" aria-pressed="false">Women</button>
+          </div>
+          <span class="lbl" style="margin-inline-start:auto">An example listing</span>
         </div>
-        <div class="garment-wrap" id="home-preview"></div>
-        <p class="hint" style="text-align:center;margin-top:12px">Any rectangle on it, front or back — the size sets the price.</p>
+
+        <div class="showcase" id="showcase" aria-live="off"></div>
+
+        <div class="showcase-foot">
+          <p class="hint" id="show-caption">—</p>
+          <div class="dots" id="show-dots" role="tablist" aria-label="Which example"></div>
+        </div>
       </div>
     </div>
 

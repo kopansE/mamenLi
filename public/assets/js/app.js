@@ -1148,30 +1148,154 @@ const SPINNER = `<div class="empty-state" style="grid-column:1/-1"><span class="
 
 /* ------------------------------------------------------------- front door */
 async function renderHome() {
+  /* The showcase is drawn first and from constants, never from the network,
+     so the front door has a picture on it the instant the page exists. What
+     is actually listed can take its time filling in underneath. */
+  renderShowcase();
+  restartShowcase();
+
   const grid = $("#home-featured");
-  const preview = $("#home-preview");
   grid.innerHTML = SPINNER;
 
   const rows = await directory();
   if (!rows.length) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>Nobody is listed yet</h3>
       <p>Be the first. Open a wearer account and put your garment up.</p></div>`;
-    preview.innerHTML = "";
     return;
   }
-
-  /* The fullest campaign makes the best advertisement for the idea. One panel,
-     not two - at hero size a pair is too small for the price chips to be read,
-     which is the one thing the preview exists to show. */
-  const best = rows.slice().sort((a, b) => b.c.pct - a.c.pct)[0];
-  preview.className = "garment-wrap solo";
-  preview.innerHTML = garmentPanel("front", {
-    listing: best.l, spots: best.spots, bids: best.bids, interactive: false,
-  });
 
   grid.innerHTML = rows.slice(0, 3).map(lotCard).join("");
   wireLots(grid);
 }
+
+/* =========================================================================
+   the showcase
+
+   The front door has to answer "what is this?" before anybody reads a word,
+   and the only honest answer is a photograph of a person with somebody's logo
+   printed on them. So: the front and the back of the same person, side by
+   side, with marks on the cloth, cycling every few seconds through the men or
+   the women.
+
+   Every rectangle below was placed against the actual photograph, on opaque
+   fabric, clear of hands, of bare arms, and of the sheer lace several of these
+   gowns carry across the shoulders - see public/assets/garments/manifest.json,
+   which records where the fabric really is in each frame. A logo on somebody's
+   skin is the one thing this picture must never show.
+
+   The companies are real names used as illustration. Nobody here sponsors
+   anybody; the footer says so, and that line is not decoration.
+   ========================================================================= */
+const SHOWCASE = {
+  male: [
+    {
+      person: "p4", name: "Roi Avital", where: "Jerusalem", garment: "suit",
+      /* jacket hangs open, so the front mark sits on the left panel rather
+         than the centre, which is tie and then waistcoat */
+      marks: [
+        { side: "front", x: 39, y: 27, w: 15, h: 7, brand: "Stripe" },
+        { side: "back", x: 39, y: 27, w: 22, h: 12, brand: "Linear" },
+      ],
+    },
+    {
+      person: "p5", name: "Amit Barak", where: "Ramat Gan", garment: "suit",
+      marks: [
+        { side: "front", x: 36, y: 27, w: 15, h: 7, brand: "Notion" },
+        { side: "back", x: 39, y: 27, w: 22, h: 12, brand: "Figma" },
+      ],
+    },
+  ],
+  female: [
+    {
+      person: "p1", name: "Maya & Tal", where: "Tel Aviv", garment: "gown",
+      /* the V neckline bottoms out at y31 and the sleeves are sheer, so the
+         chest mark starts below the V and stays inside the beaded panel */
+      marks: [
+        { side: "front", x: 43, y: 33, w: 15, h: 7, brand: "Aesop" },
+        { side: "back", x: 39, y: 46, w: 22, h: 11, brand: "Monzo" },
+      ],
+    },
+    {
+      person: "p2", name: "Dana Halevi", where: "Caesarea", garment: "gown",
+      /* the whole back above the waist seam is illusion lace over skin */
+      marks: [
+        { side: "front", x: 43, y: 41, w: 16, h: 8, brand: "Oatly" },
+        { side: "back", x: 38, y: 44, w: 24, h: 11, brand: "Spotify" },
+      ],
+    },
+    {
+      person: "p3", name: "Noa Lev", where: "Haifa", garment: "gown",
+      /* plain matte satin between y24 and y36 - the best surface in the set */
+      marks: [
+        { side: "front", x: 44, y: 26, w: 15, h: 8, brand: "Patagonia" },
+        { side: "back", x: 37, y: 46, w: 24, h: 12, brand: "Duolingo" },
+      ],
+    },
+  ],
+};
+
+const SHOW_MS = 3000;
+const show = { tab: "male", i: 0, timer: null, paused: false };
+
+function showPanel(entry, side) {
+  const marks = entry.marks.filter(m => m.side === side).map(m => `
+    <span class="mark" style="top:${m.y}%;left:${m.x}%;width:${m.w}%;height:${m.h}%">
+      <b>${esc(m.brand)}</b>
+    </span>`).join("");
+  return `<figure class="shot">
+    <img src="/assets/garments/${entry.person}-${side}.jpg"
+         alt="${esc(entry.name)}, ${side}, with sponsors printed on the ${esc(entry.garment)}"
+         loading="lazy" decoding="async">
+    <span class="side-tag">${side}</span>${marks}
+  </figure>`;
+}
+
+function renderShowcase() {
+  const list = SHOWCASE[show.tab];
+  const entry = list[show.i % list.length];
+
+  $("#showcase").innerHTML = showPanel(entry, "front") + showPanel(entry, "back");
+  $("#show-caption").textContent =
+    `${entry.name} · ${entry.where} — two sponsors, drawn and priced by area`;
+
+  $("#show-dots").innerHTML = list.map((e, n) =>
+    `<button role="tab" aria-selected="${n === show.i % list.length}"
+       aria-label="${esc(e.name)}" data-show="${n}"></button>`).join("");
+  $$("#show-dots [data-show]").forEach(b => b.addEventListener("click", () => {
+    show.i = Number(b.dataset.show);
+    renderShowcase();
+    restartShowcase();
+  }));
+
+  $("#show-male").setAttribute("aria-pressed", String(show.tab === "male"));
+  $("#show-female").setAttribute("aria-pressed", String(show.tab === "female"));
+}
+
+/* Rotation stops while somebody is looking at one deliberately - a picture
+   that moves under the cursor is a picture nobody can study. */
+function restartShowcase() {
+  clearInterval(show.timer);
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  show.timer = setInterval(() => {
+    if (show.paused || document.hidden) return;
+    show.i = (show.i + 1) % SHOWCASE[show.tab].length;
+    renderShowcase();
+  }, SHOW_MS);
+}
+
+function setShowTab(tab) {
+  show.tab = tab;
+  show.i = 0;
+  renderShowcase();
+  restartShowcase();
+}
+
+$("#show-male").addEventListener("click", () => setShowTab("male"));
+$("#show-female").addEventListener("click", () => setShowTab("female"));
+$("#showcase").addEventListener("pointerenter", () => { show.paused = true; });
+$("#showcase").addEventListener("pointerleave", () => { show.paused = false; });
+$("#showcase").addEventListener("focusin", () => { show.paused = true; });
+$("#showcase").addEventListener("focusout", () => { show.paused = false; });
 
 /* --------------------------------------------------------- browse screen */
 function matchesFilter(l, filter) {
@@ -2201,6 +2325,26 @@ function debounce(fn, ms) {
    boot
    ========================================================================= */
 (async function boot() {
+  /* Anything that throws in here used to leave the page exactly as the server
+     sent it. That is survivable now the front door ships visible, but the
+     reader still deserves to be told, rather than sitting in front of a
+     marketplace that is silently empty. */
+  try {
+    await bootReally();
+  } catch (e) {
+    console.error("boot failed:", e);
+    const grid = $("#home-featured");
+    if (grid) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+        <h3>We could not reach the market</h3>
+        <p>The page loaded but the listings did not. Reload, and if it keeps happening
+           it is us, not you.</p></div>`;
+    }
+    toast("Could not load the marketplace. Try reloading.", "bad");
+  }
+})();
+
+async function bootReally() {
   const { mode } = await Store.init();
   $("#foot-mode").textContent = mode === "supabase"
     ? `Live · ${Store.config.publishableKey ? "payments on" : "payments not configured"}`
@@ -2232,4 +2376,4 @@ function debounce(fn, ms) {
     selectSpot(spotParam, false);
     document.getElementById("spots").scrollIntoView({ behavior: "smooth" });
   }
-})();
+}
