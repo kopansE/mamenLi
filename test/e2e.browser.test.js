@@ -10,7 +10,7 @@
    it exercises the same rendering, the same escaping and the same engine the
    live mode does.
 
-   Three things about this file are load-bearing.
+   Four things about this file are load-bearing.
 
      * The viewport comes from Emulation.setDeviceMetricsOverride, never from
        --window-size, which this machine's display scaling distorts.
@@ -19,6 +19,10 @@
        mid-reveal.
      * Every test gets a fresh tab with localStorage cleared, so no test can
        inherit another's account or bids.
+     * `/` is a front door now, not a listing. `open()` walks through it -
+       the brand's door, then the first publisher in the directory - so the
+       tests that want a garment in front of them still get one. Nothing may
+       wait on `.srow` before that walk has happened.
 
    If Chrome is not installed the whole suite skips rather than fails.
    ========================================================================= */
@@ -38,8 +42,25 @@ const SUITE_OPTS = CHROME ? {} : {
   skip: "Chrome was not found - set SQUAREINCH_CHROME to its path, or leave this suite skipped",
 };
 
-/* The app has booted when Store is up and the spot list has been drawn. */
-const READY = '!!(window.Store && document.querySelectorAll(".srow").length)';
+/* The five screens, in the order they appear in the markup. */
+const SCREENS = ["home", "browse", "campaign", "auth", "studio"];
+
+/* The app has booted when Store is up and it has chosen a screen to show.
+   This has to be screen-agnostic: `/` lands on the front door, which has no
+   spot list on it, so waiting for `.srow` here would hang there for ever. */
+const BOOTED =
+  `!!(window.Store && ${JSON.stringify(SCREENS)}.some(s => !document.getElementById("screen-" + s).hidden))`;
+
+/* Which screen is up. The app hides every <main> but one, so this is a
+   one-element list, and asserting on the whole list catches a second screen
+   being left open as well as the wrong one being shown. */
+const VISIBLE = `${JSON.stringify(SCREENS)}.filter(s => !document.getElementById("screen-" + s).hidden)`;
+
+/* The two waits the walk from the front door to a listing needs. */
+const BROWSE_READY =
+  '!!(!document.getElementById("screen-browse").hidden && document.querySelector("#browse-grid .lot"))';
+const CAMPAIGN_READY =
+  '!!(!document.getElementById("screen-campaign").hidden && document.querySelectorAll(".srow").length)';
 
 /* Forces the scroll-reveal sections visible before anything is measured. */
 const REVEAL = 'document.querySelectorAll(".rv").forEach(e => e.classList.add("shown"));';
@@ -61,14 +82,37 @@ describe("the page in a real browser", SUITE_OPTS, () => {
     if (srv) await srv.stop();
   });
 
-  /** A fresh tab, with this origin's localStorage wiped, on a booted page. */
-  async function open({ width = 1280, height = 900, query = "" } = {}) {
+  /**
+   * A fresh tab, with this origin's localStorage wiped, on a booted page.
+   *
+   * `/` is the front door, so by default this walks it - the brand's door
+   * through to the directory, then the first publisher's card - and leaves
+   * the tab on a campaign, which is what nearly everything below wants to be
+   * looking at. `screen: "home"` and `screen: "browse"` stop short of that,
+   * and a query string that already names a listing is left to route itself.
+   */
+  async function open({ width = 1280, height = 900, query = "", screen = "campaign" } = {}) {
     const page = await browser.newPage({ width, height });
     openPages.push(page);
     await page.clearStorage(ORIGIN);
-    await page.goto(ORIGIN + "/" + query, { ready: READY });
+    await page.goto(ORIGIN + "/" + query, { ready: BOOTED });
+    if (screen === "browse") await intoDirectory(page);
+    else if (screen === "campaign" && !/[?&]l=/.test(query)) await intoFirstListing(page);
     await page.evaluate(REVEAL + " return true;");
     return page;
+  }
+
+  /** Through a door and into the directory, waiting for it to fill in. */
+  async function intoDirectory(page, via = "door-brand") {
+    await page.evaluate(`document.getElementById(${JSON.stringify(via)}).click(); return true;`);
+    await page.waitFor(BROWSE_READY, 8000, "the directory to fill in");
+  }
+
+  /** …and on into the first publisher listed there. */
+  async function intoFirstListing(page, via) {
+    await intoDirectory(page, via);
+    await page.evaluate(`document.querySelector("#browse-grid .lot").click(); return true;`);
+    await page.waitFor(CAMPAIGN_READY, 8000, "the first publisher's garment to draw");
   }
 
   /* Sign up, on whichever screen we are already on. */
@@ -128,7 +172,8 @@ describe("the page in a real browser", SUITE_OPTS, () => {
     }
 
     it("says it is in demo mode, because nothing is configured", async () => {
-      const page = await open();
+      /* The footer carries this on every screen, so the front door will do. */
+      const page = await open({ screen: "home" });
       assert.equal(await page.evaluate("window.Store.mode"), "demo");
       assert.match(await page.evaluate('document.getElementById("foot-mode").textContent'), /demo mode/i);
     });
@@ -165,6 +210,151 @@ describe("the page in a real browser", SUITE_OPTS, () => {
   });
 
   /* ==================================================================== */
+  describe("the front door and the directory", () => {
+    it("the door asks which side of the table you are on, and picks nobody for you", async () => {
+      const page = await open({ screen: "home" });
+      const m = await page.evaluate(`
+        ${REVEAL}
+        await new Promise(r => setTimeout(r, 600));
+        return {
+          screen: ${VISIBLE},
+          doors: [...document.querySelectorAll(".doors .door")].map(d => d.id),
+          featured: document.querySelectorAll("#home-featured .lot").length,
+          rows: document.querySelectorAll(".srow").length,
+          who: document.getElementById("hero-who").textContent.trim(),
+        };
+      `);
+
+      assert.deepEqual(m.screen, ["home"], "a visitor with no listing in the URL should land on the front door");
+      assert.deepEqual(m.doors, ["door-brand", "door-publisher"],
+        "both sides of the market have to be offered, or one of them has no way in");
+
+      /* The old front page opened whichever listing happened to be first,
+         which quietly picked a publisher on the visitor's behalf and made the
+         other two invisible. Nothing may be loaded until somebody chooses. */
+      assert.equal(m.rows, 0, "the front door loaded a listing on its own");
+      assert.ok(!/Maya|Roi|Noa/.test(m.who),
+        `the campaign screen was filled in behind the door, with "${m.who}"`);
+
+      /* It still has to show that there is something here, though. */
+      assert.equal(m.featured, 3, `the door advertised ${m.featured} publishers, not the three that are open`);
+      assert.deepEqual(page.errors(), [], `console errors on the front door:\n${page.consoleText()}`);
+    });
+
+    it("the directory lists every publisher, and a chip narrows it", async () => {
+      const page = await open({ screen: "browse" });
+
+      const names = `[...document.querySelectorAll("#browse-grid .lot h3")].map(h => h.textContent.trim()).sort()`;
+      const all = await page.evaluate(`
+        ${REVEAL}
+        return { screen: ${VISIBLE}, names: ${names},
+                 count: document.getElementById("browse-count").textContent };
+      `);
+      assert.deepEqual(all.screen, ["browse"]);
+      assert.deepEqual(all.names, ["Maya & Tal", "Noa Lev", "Roi Avital"],
+        "the whole seeded market should be on the directory, not just the first of it");
+      assert.equal(all.count, "3 of 3", `the count reads "${all.count}"`);
+
+      /* A chip that filters the grid but not the count, or the other way
+         round, is worse than one that does nothing: it misreports the market.
+         Both are read back on every facet below. */
+      const chip = facet => page.evaluate(`
+        const b = document.querySelector('[data-filter="${facet}"]');
+        b.click();
+        await new Promise(r => setTimeout(r, 400));
+        return { names: ${names},
+                 count: document.getElementById("browse-count").textContent,
+                 pressed: b.getAttribute("aria-pressed") };
+      `);
+
+      const suits = await chip("suit");
+      assert.deepEqual(suits.names, ["Noa Lev", "Roi Avital"], "the suits are Roi's and Noa's");
+      assert.equal(suits.count, "2 of 3");
+      assert.equal(suits.pressed, "true", "the chip that is filtering does not say so");
+
+      /* Not the same cut as the garment: Noa's suit is a women's one, so she
+         is in both lists and Roi is in neither of Maya's. */
+      const women = await chip("female");
+      assert.deepEqual(women.names, ["Maya & Tal", "Noa Lev"],
+        "women's should be the gown plus Noa's suit - it is who is wearing it, not what it is");
+      assert.equal(women.count, "2 of 3");
+
+      const back = await chip("all");
+      assert.deepEqual(back.names, ["Maya & Tal", "Noa Lev", "Roi Avital"], "the filter did not come off again");
+      assert.deepEqual(page.errors(), [], `console errors in the directory:\n${page.consoleText()}`);
+    });
+
+    it("opening a card opens that publisher, not the first one on the page", async () => {
+      const page = await open({ screen: "browse" });
+      const m = await page.evaluate(`
+        const lot = [...document.querySelectorAll("#browse-grid .lot")]
+          .find(b => b.querySelector("h3").textContent.trim() === "Roi Avital");
+        if (!lot) return { error: "Roi Avital has no card in the directory" };
+        lot.click();
+        await new Promise(r => setTimeout(r, 900));
+        ${REVEAL}
+        return {
+          screen: ${VISIBLE},
+          who: document.getElementById("hero-who").textContent.trim(),
+          where: document.getElementById("hero-where").textContent,
+          rows: document.querySelectorAll(".srow").length,
+          total: Number(document.getElementById("goal-total").textContent),
+        };
+      `);
+
+      assert.ok(!m.error, m.error);
+      assert.deepEqual(m.screen, ["campaign"], "a card in the directory did not open a campaign");
+      assert.equal(m.who, "Roi Avital",
+        `the second card opened "${m.who}" - every card is wired to the same handler, so one of them ` +
+        "carrying the wrong id would be invisible until a buyer bid on the wrong garment");
+      assert.match(m.where, /Jerusalem/, "the hero is showing somebody else's city");
+      assert.ok(m.rows >= 6, `only ${m.rows} spots were listed for this publisher`);
+      assert.equal(m.total, m.rows);
+    });
+
+    it("the signed-out header sends a brand to the market and a publisher to an account", async () => {
+      const page = await open({ screen: "home" });
+
+      /* "Get a spot" used to open an empty sign-up form, which asked someone
+         to commit before they had seen anything. It shows them the market. */
+      const get = await page.evaluate(`
+        document.getElementById("nav-get").click();
+        await new Promise(r => setTimeout(r, 500));
+        return ${VISIBLE};
+      `);
+      assert.deepEqual(get, ["browse"], "'Get a spot' should show a brand what there is to buy");
+
+      const publish = await page.evaluate(`
+        document.getElementById("nav-publish").click();
+        await new Promise(r => setTimeout(r, 400));
+        return { screen: ${VISIBLE},
+                 publisherPressed: document.getElementById("role-client").getAttribute("aria-pressed"),
+                 label: document.getElementById("role-client").textContent.trim(),
+                 brandFieldShown: !document.getElementById("au-brand-fld").hidden };
+      `);
+      assert.deepEqual(publish.screen, ["auth"], "a signed-out publisher needs an account before a studio");
+      assert.equal(publish.publisherPressed, "true",
+        "the publisher's door has to arrive with the publishing side already chosen - the side cannot " +
+        "be changed after the account exists");
+      assert.equal(publish.label, "I'm a publisher");
+      assert.equal(publish.brandFieldShown, false, "a publisher is not asked for a brand name");
+
+      /* Sign in is the other button, and it is a different thing again: no
+         role to pick, because the account already has one. */
+      const signIn = await page.evaluate(`
+        document.getElementById("nav-in").click();
+        await new Promise(r => setTimeout(r, 400));
+        return { screen: ${VISIBLE},
+                 cta: document.getElementById("auth-go").textContent.trim(),
+                 roleHidden: document.getElementById("role-toggle").hidden };
+      `);
+      assert.deepEqual(signIn.screen, ["auth"]);
+      assert.equal(signIn.cta, "Sign in", `the form still offers to "${signIn.cta}"`);
+      assert.equal(signIn.roleHidden, true, "signing in must not offer to change which side you are on");
+    });
+  });
+
+  /* ==================================================================== */
   describe("signing in to bid", () => {
     it("a signed-out tap on a spot row routes to the auth screen", async () => {
       const page = await open({ width: 390, height: 844 });
@@ -173,7 +363,7 @@ describe("the page in a real browser", SUITE_OPTS, () => {
         document.querySelector(".srow").click();
         await new Promise(r => setTimeout(r, 200));
         return {
-          screen: ["campaign","book","auth","studio"].filter(s => !document.getElementById("screen-" + s).hidden),
+          screen: ${VISIBLE},
           brandFieldShown: !document.getElementById("au-brand-fld").hidden,
           sheetHidden: document.getElementById("scrim").hidden,
         };
@@ -189,7 +379,7 @@ describe("the page in a real browser", SUITE_OPTS, () => {
         ${REVEAL}
         document.querySelector("#garment-wrap .spot").click();
         await new Promise(r => setTimeout(r, 250));
-        return ["campaign","book","auth","studio"].filter(s => !document.getElementById("screen-" + s).hidden);
+        return ${VISIBLE};
       `);
       assert.deepEqual(m, ["auth"]);
     });
@@ -213,7 +403,7 @@ describe("the page in a real browser", SUITE_OPTS, () => {
 
       const m = await page.evaluate(`
         return {
-          screen: ["campaign","book","auth","studio"].filter(s => !document.getElementById("screen-" + s).hidden),
+          screen: ${VISIBLE},
           sheetOpen: !document.getElementById("scrim").hidden,
           title: document.getElementById("sheet-title").textContent,
           brandPrefilled: document.getElementById("bid-brand").value,
@@ -235,13 +425,18 @@ describe("the page in a real browser", SUITE_OPTS, () => {
       `);
       await page.evaluate(SIGN_UP("client", { name: "Pub One", email: "pub-one@example.test" }));
       const m = await page.evaluate(`
-        document.getElementById("home-link").click();
+        /* Signing up already answered the tap that sent them here, and said
+           so in a toast. Clear it, so what is read below can only be the
+           refusal for the tap that follows it. */
+        document.getElementById("toasts").innerHTML = "";
         ${REVEAL}
         document.querySelector(".srow").click();
         await new Promise(r => setTimeout(r, 250));
-        return { sheetOpen: !document.getElementById("scrim").hidden,
+        return { screen: ${VISIBLE},
+                 sheetOpen: !document.getElementById("scrim").hidden,
                  toasts: document.getElementById("toasts").textContent };
       `);
+      assert.deepEqual(m.screen, ["campaign"], "a publisher who taps a spot should stay where they are");
       assert.equal(m.sheetOpen, false, "a publisher was shown a bid sheet");
       assert.match(m.toasts, /publisher|brand/i);
     });
@@ -460,7 +655,7 @@ describe("the page in a real browser", SUITE_OPTS, () => {
         ${REVEAL}
         document.querySelector(".srow").click();
         await new Promise(r => setTimeout(r, 250));
-        return ["campaign","book","auth","studio"].filter(s => !document.getElementById("screen-" + s).hidden);
+        return ${VISIBLE};
       `);
       assert.deepEqual(second, ["auth"], "signing out did not put the next visitor back at the door");
 
@@ -495,8 +690,10 @@ describe("the page in a real browser", SUITE_OPTS, () => {
       const page = await open();
 
       /* Write the payload into the listing and a spot the way a publisher
-         would, then reload so it is rendered from storage on a cold boot. */
-      await page.evaluate(`
+         would, then reload so it is rendered from storage on a cold boot.
+         The reload deep-links straight back to the same listing: `/` is the
+         front door now, and the point here is the campaign screen. */
+      const listingId = await page.evaluate(`
         const PAY = ${JSON.stringify(XSS)};
         const listings = await window.Store.listings.list({ openOnly: false });
         const id = listings[0].id;
@@ -506,9 +703,9 @@ describe("the page in a real browser", SUITE_OPTS, () => {
         });
         const spots = await window.Store.spots.list(id);
         await window.Store.spots.update(spots[0].id, { name: PAY, blurb: PAY, badge: PAY.slice(0, 10) });
-        return true;
+        return id;
       `);
-      await page.goto(ORIGIN + "/", { ready: READY });
+      await page.goto(`${ORIGIN}/?l=${encodeURIComponent(listingId)}`, { ready: CAMPAIGN_READY });
 
       /* …and as a brand name, which reaches the wall and the garment. */
       await page.evaluate(`${REVEAL} document.querySelector(".srow").click(); await new Promise(r => setTimeout(r, 250)); return true;`);
@@ -523,27 +720,37 @@ describe("the page in a real browser", SUITE_OPTS, () => {
         return true;
       `);
 
+      /* Out to the directory and back in through the publisher's own card.
+         Everything on the way is redrawn from storage, and the card carries
+         the payload too - the publisher's name is what titles it. */
       const m = await page.evaluate(`
         ${REVEAL}
-        document.getElementById("nav-book").click();
-        await new Promise(r => setTimeout(r, 600));
-        document.getElementById("home-link").click();
+        document.getElementById("nav-browse").click();
+        await new Promise(r => setTimeout(r, 700));
+        const lot = [...document.querySelectorAll("#browse-grid .lot")]
+          .find(b => b.dataset.listing === ${JSON.stringify(listingId)});
+        const inDirectory = document.getElementById("browse-grid").textContent;
+        if (lot) lot.click();
+        await new Promise(r => setTimeout(r, 700));
         ${REVEAL}
         await new Promise(r => setTimeout(r, 400));
         const PAY = ${JSON.stringify(XSS)};
         const text = document.body.innerText;
         return {
+          screen: ${VISIBLE},
           pwned: window.__pwned === undefined ? "undefined" : window.__pwned,
           injectedImgs: document.querySelectorAll('img[src="x"]').length,
           onerrorAttrs: document.querySelectorAll("[onerror]").length,
           literalInHeadline: document.getElementById("hero-h1").textContent.includes(PAY),
           literalInList: document.getElementById("spotlist").textContent.includes(PAY),
           literalOnWall: document.getElementById("wall").textContent.includes(PAY),
+          literalInDirectory: inDirectory.includes(PAY),
           headlineHtml: document.getElementById("hero-h1").innerHTML.slice(0, 200),
           anyPayloadText: text.includes(PAY),
         };
       `);
 
+      assert.deepEqual(m.screen, ["campaign"], "the walk out to the directory and back never arrived");
       assert.equal(m.pwned, "undefined", "the payload executed: window.__pwned was set");
       assert.equal(m.injectedImgs, 0, `an <img src="x"> was built from user text (${m.injectedImgs} of them)`);
       assert.equal(m.onerrorAttrs, 0, "an onerror attribute was built from user text");
@@ -553,6 +760,7 @@ describe("the page in a real browser", SUITE_OPTS, () => {
       assert.equal(m.literalInHeadline, true, `the headline did not render the payload as text: ${m.headlineHtml}`);
       assert.equal(m.literalInList, true, "the spot list did not render the payload as text");
       assert.equal(m.literalOnWall, true, "the wall of marks did not render the brand name as text");
+      assert.equal(m.literalInDirectory, true, "the directory card did not render the publisher's name as text");
       assert.match(m.headlineHtml, /&lt;img/, "the headline should be escaped, not stripped");
 
       assert.deepEqual(page.errors(), [], `console errors while rendering the payload:\n${page.consoleText()}`);
@@ -560,16 +768,16 @@ describe("the page in a real browser", SUITE_OPTS, () => {
 
     it("a javascript: logo URL is never put in a src", async () => {
       const page = await open();
-      const m = await page.evaluate(`
+      const id = await page.evaluate(`
         const listings = await window.Store.listings.list({ openOnly: false });
         await window.Store.listings.update(listings[0].id, {
           photo_front: "javascript:window.__pwned=1",
           photo_back: "data:text/html,<script>window.__pwned=1<\\/script>",
         });
-        location.reload();
-        return true;
+        return listings[0].id;
       `).catch(() => null);
-      await page.goto(ORIGIN + "/", { ready: READY });
+      /* Straight back to the same listing, where both photographs are drawn. */
+      await page.goto(`${ORIGIN}/?l=${encodeURIComponent(id)}`, { ready: CAMPAIGN_READY });
       const out = await page.evaluate(`
         ${REVEAL}
         return {
@@ -586,12 +794,14 @@ describe("the page in a real browser", SUITE_OPTS, () => {
   /* ==================================================================== */
   describe("the publisher's side", () => {
     it("sign up as a publisher, draw a spot, save it, open bidding, view it as a buyer", async () => {
-      const page = await open();
+      const page = await open({ screen: "home" });
 
-      /* 1. an account on the publishing side */
+      /* 1. an account on the publishing side, taken through the publisher's
+         own door on the front page - "Get a spot" is the brand's way in and
+         lands in the directory, which would leave this on the wrong side. */
       const user = await page.evaluate(`
-        document.getElementById("nav-get").click();
-        await new Promise(r => setTimeout(r, 200));
+        document.getElementById("door-publisher").click();
+        await new Promise(r => setTimeout(r, 300));
         ${SIGN_UP("client", { name: "Pub Lisher", email: "publisher@example.test" })}
       `);
       assert.equal(user.role, "client", "the account was not created on the publishing side");
@@ -599,7 +809,7 @@ describe("the page in a real browser", SUITE_OPTS, () => {
       /* 2. it drops straight into the studio with a listing of its own */
       const studio = await page.evaluate(`
         return {
-          screen: ["campaign","book","auth","studio"].filter(s => !document.getElementById("screen-" + s).hidden),
+          screen: ${VISIBLE},
           spots: document.getElementById("studio-spotcount").textContent,
           mine: (await window.Store.listings.mine()).length,
         };
@@ -681,7 +891,7 @@ describe("the page in a real browser", SUITE_OPTS, () => {
         document.getElementById("studio-view").click();
         await new Promise(r => setTimeout(r, 600));
         ${REVEAL}
-        return { screen: ["campaign","book","auth","studio"].filter(s => !document.getElementById("screen-" + s).hidden),
+        return { screen: ${VISIBLE},
                  rows: document.querySelectorAll(".srow").length,
                  list: document.getElementById("spotlist").textContent.replace(/\\s+/g, " ").trim(),
                  marks: document.querySelectorAll("#garment-wrap .spot").length,
@@ -698,10 +908,10 @@ describe("the page in a real browser", SUITE_OPTS, () => {
     });
 
     it("bidding cannot be opened on a garment with no spots on it", async () => {
-      const page = await open();
+      const page = await open({ screen: "home" });
       const m = await page.evaluate(`
-        document.getElementById("nav-get").click();
-        await new Promise(r => setTimeout(r, 200));
+        document.getElementById("nav-publish").click();
+        await new Promise(r => setTimeout(r, 300));
         ${SIGN_UP("client", { name: "Empty Pub", email: "empty@example.test" })}
       `);
       assert.equal(m.role, "client");
@@ -720,7 +930,8 @@ describe("the page in a real browser", SUITE_OPTS, () => {
   /* ==================================================================== */
   describe("deep links", () => {
     it("?l=&spot= selects that spot", async () => {
-      const first = await open();
+      /* This tab only reads ids back out of the store, so it can stay put. */
+      const first = await open({ screen: "home" });
       const ids = await first.evaluate(`
         const listings = await window.Store.listings.list({ openOnly: false });
         const spots = await window.Store.spots.list(listings[0].id);
@@ -742,7 +953,9 @@ describe("the page in a real browser", SUITE_OPTS, () => {
 
     it("?paid=1 and ?paid=0 tell the buyer what happened on the way back from Stripe", async () => {
       for (const [q, re] of [["?paid=1", /authorised/i], ["?paid=0", /cancelled/i]]) {
-        const page = await open({ query: q });
+        /* Neither of these names a listing, so both land on the front door.
+           The message has to be waiting there all the same. */
+        const page = await open({ query: q, screen: "home" });
         const toasts = await page.evaluate('document.getElementById("toasts").textContent');
         assert.match(toasts, re, `${q} said nothing useful: "${toasts}"`);
       }

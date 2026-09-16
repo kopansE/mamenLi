@@ -135,6 +135,7 @@ choose their own rate-limit bucket, which silently disables every limit.
 | `20260916160000_spot_price_defaults_to_floor` | an unbid spot is worth its floor, not null |
 | `20260916180000_role_chosen_once` | OAuth users pick a side once, then it freezes |
 | `20260916190000_fix_role_locked_null` | fixed a NULL bug in the above that broke **all** sign-ups |
+| `20260916200000_garment_is_worn_by_someone` | added `listings.wears` — who the garment is cut for, which `garment` had been guessing |
 
 **Never edit a migration that has run.** Add a new one beside it.
 

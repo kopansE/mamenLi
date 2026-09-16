@@ -1,8 +1,14 @@
 /* =========================================================================
    Square Inch - the application.
 
-   Four screens behind one page: the campaign (the thing a brand lands on),
-   the book (every open garment), auth, and the studio (the publisher's side).
+   Five screens behind one page:
+
+     home      the front door, where you say which side of the table you are on
+     browse    the directory of every publisher taking bids
+     campaign  one publisher's garment, which is what a brand actually buys from
+     auth      opening an account
+     studio    the publisher's own side of it
+
    Everything below assumes a phone first; the desktop layout is what the CSS
    adds on top, not the other way round.
    ========================================================================= */
@@ -13,7 +19,7 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 /* ------------------------------------------------------------------ state */
 const state = {
-  screen: "campaign",
+  screen: "home",
   listing: null,
   spots: [],
   bids: [],
@@ -22,6 +28,9 @@ const state = {
   selected: null,
   drawing: false,
   unsubscribe: null,
+  /* the directory: every open listing, and which facet is being shown */
+  directory: [],
+  filter: "all",
 };
 
 /* ------------------------------------------------------------- formatting */
@@ -73,7 +82,7 @@ function toast(text, kind = "") {
    does nothing. */
 let lastFocusSel = null;
 
-const OUTSIDE = "header.topbar, main, footer.foot, .actionbar, .tick";
+const OUTSIDE = "header.topbar, main, footer.foot, .actionbar";
 
 function openSheet({ kicker = "", title, body, onOpen }) {
   const active = document.activeElement;
@@ -139,7 +148,7 @@ document.addEventListener("keydown", e => {
    they have not - so a listing is legible from the moment it is created.
    ========================================================================= */
 const SILHOUETTE = {
-  gown: {
+  "gown-female": {
     front: `<path d="M112 58 L188 58 L178 168 C178 168 250 244 254 384 L46 384 C50 244 122 168 122 168 Z"/>
             <path d="M138 58 Q150 84 162 58" fill="none" stroke-width="2" opacity=".45"/>
             <path d="M150 168 L150 384" fill="none" stroke-width="1.5" opacity=".2"/>`,
@@ -147,35 +156,87 @@ const SILHOUETTE = {
             <path d="M150 58 L150 168" fill="none" stroke-width="2" opacity=".45"/>
             <path d="M126 92 Q150 104 174 92" fill="none" stroke-width="1.5" opacity=".3"/>`,
   },
-  suit: {
+  /* a floor-length coat rather than a dress, so a man listing a "gown" still
+     gets a drawing that looks like the thing he is going to wear */
+  "gown-male": {
+    front: `<path d="M104 60 L196 60 L206 154 L198 380 L102 380 L94 154 Z"/>
+            <path d="M150 60 L128 130 L150 196 L172 130 Z" fill="none" stroke-width="2" opacity=".45"/>
+            <path d="M150 196 L150 380" fill="none" stroke-width="1.5" opacity=".2"/>`,
+    back:  `<path d="M104 60 L196 60 L206 154 L198 380 L102 380 L94 154 Z"/>
+            <path d="M150 60 L150 380" fill="none" stroke-width="2" opacity=".35"/>
+            <path d="M108 118 L192 118" fill="none" stroke-width="1.5" opacity=".25"/>`,
+  },
+  /* The jacket hem and the sleeve seams are what stop a suit reading as a
+     jumpsuit - without them the outline is one unbroken shape from shoulder
+     to ankle and nobody can tell where the jacket ends. */
+  "suit-male": {
     front: `<path d="M96 62 L204 62 L214 196 L198 384 L156 384 L150 236 L144 384 L102 384 L86 196 Z"/>
-            <path d="M150 62 L132 130 L150 236 L168 130 Z" fill="none" stroke-width="2" opacity=".45"/>`,
+            <path d="M86 196 L214 196" fill="none" stroke-width="1.5" opacity=".4"/>
+            <path d="M114 64 L104 194 M186 64 L196 194" fill="none" stroke-width="1.5" opacity=".3"/>
+            <path d="M150 62 L132 130 L150 200 L168 130 Z" fill="none" stroke-width="2" opacity=".45"/>
+            <path d="M150 236 L150 384" fill="none" stroke-width="1.5" opacity=".25"/>`,
     back:  `<path d="M96 62 L204 62 L214 196 L198 384 L156 384 L150 236 L144 384 L102 384 L86 196 Z"/>
-            <path d="M150 62 L150 384" fill="none" stroke-width="2" opacity=".3"/>
-            <path d="M104 118 L196 118" fill="none" stroke-width="1.5" opacity=".25"/>`,
+            <path d="M86 196 L214 196" fill="none" stroke-width="1.5" opacity=".4"/>
+            <path d="M114 64 L104 194 M186 64 L196 194" fill="none" stroke-width="1.5" opacity=".3"/>
+            <path d="M150 62 L150 196" fill="none" stroke-width="2" opacity=".3"/>
+            <path d="M104 112 L196 112" fill="none" stroke-width="1.5" opacity=".25"/>`,
+  },
+  /* narrower shoulders, a waist, a longer line through the leg */
+  "suit-female": {
+    front: `<path d="M108 62 L192 62 L200 150 L192 208 L188 384 L154 384 L150 240 L146 384 L112 384 L108 208 L100 150 Z"/>
+            <path d="M104 186 L196 186" fill="none" stroke-width="1.5" opacity=".4"/>
+            <path d="M122 64 L112 184 M178 64 L188 184" fill="none" stroke-width="1.5" opacity=".3"/>
+            <path d="M150 62 L134 124 L150 190 L166 124 Z" fill="none" stroke-width="2" opacity=".45"/>
+            <path d="M150 240 L150 384" fill="none" stroke-width="1.5" opacity=".25"/>`,
+    back:  `<path d="M108 62 L192 62 L200 150 L192 208 L188 384 L154 384 L150 240 L146 384 L112 384 L108 208 L100 150 Z"/>
+            <path d="M104 186 L196 186" fill="none" stroke-width="1.5" opacity=".4"/>
+            <path d="M122 64 L112 184 M178 64 L188 184" fill="none" stroke-width="1.5" opacity=".3"/>
+            <path d="M150 62 L150 186" fill="none" stroke-width="2" opacity=".3"/>
+            <path d="M110 110 L190 110" fill="none" stroke-width="1.5" opacity=".25"/>`,
   },
 };
 
-function silhouetteSvg(garment, side) {
-  const g = SILHOUETTE[garment] || SILHOUETTE.gown;
+/* What the publisher is wearing, normalised. Older listings predate the
+   column, so a gown reads as women's and a suit as men's unless told. */
+function wornBy(L) {
+  const w = String((L && L.wears) || "").toLowerCase();
+  if (w === "male" || w === "female") return w;
+  return (L && L.garment) === "suit" ? "male" : "female";
+}
+const GARMENT_WORD = { gown: "gown", suit: "suit" };
+function garmentWord(L) {
+  return GARMENT_WORD[L && L.garment] || "garment";
+}
+
+function silhouetteSvg(garment, side, wears) {
+  const key = `${GARMENT_WORD[garment] || "gown"}-${wears === "male" ? "male" : "female"}`;
+  const g = SILHOUETTE[key] || SILHOUETTE["gown-female"];
   return `<svg viewBox="0 0 300 420" role="img" aria-label="${esc(garment)}, ${esc(side)}">
-    <g fill="rgba(251,243,255,.1)" stroke="rgba(251,243,255,.45)" stroke-width="1.5"
+    <g fill="rgba(20,18,14,.05)" stroke="rgba(20,18,14,.34)" stroke-width="1.5"
        stroke-linejoin="round">${g[side] || g.front}</g></svg>`;
 }
 
-/* One panel: the picture plus every spot on that side. */
-function garmentPanel(side, { interactive = true, editing = false } = {}) {
-  const L = state.listing;
+/* One panel: the picture plus every spot on that side. It defaults to the
+   listing on screen, but takes an explicit one so the front door can show a
+   real listing without the campaign screen being the one loaded. */
+function garmentPanel(side, opts = {}) {
+  const {
+    listing: L = state.listing,
+    spots: allSpots = state.spots,
+    bids: allBids = state.bids,
+    interactive = true,
+    editing = false,
+  } = opts;
   if (!L) return "";
   const photo = safeUrl(L["photo_" + side]);
-  const bySpot = Store.bids.bySpot(state.bids);
-  const spots = state.spots.filter(s => s.side === side);
+  const bySpot = Store.bids.bySpot(allBids);
+  const spots = allSpots.filter(s => s.side === side);
 
   const art = photo
-    ? `<img src="${esc(photo)}" alt="The ${esc(L.garment)}, ${esc(side)}" loading="lazy" decoding="async">`
-    : silhouetteSvg(L.garment, side) +
+    ? `<img src="${esc(photo)}" alt="The ${esc(garmentWord(L))}, ${esc(side)}" loading="lazy" decoding="async">`
+    : silhouetteSvg(L.garment, side, wornBy(L)) +
       `<div class="empty"><p class="lbl">No photograph yet</p>
-         <p style="font-size:.85rem">Spots are marked out on the drawing until one is uploaded.</p></div>`;
+         <p>Spots are marked out on the drawing until one is uploaded.</p></div>`;
 
   const marks = spots.map(s => {
     const settled = Store.market(s, bySpot[s.id]);
@@ -197,7 +258,9 @@ function garmentPanel(side, { interactive = true, editing = false } = {}) {
   }).join("");
 
   return `<div>
-    <div class="garment${editing ? " editing" : ""}" data-side="${side}">${art}${marks}</div>
+    <div class="garment${editing ? " editing" : ""}" data-side="${side}">
+      ${art}<span class="side-tag">${side}</span>${marks}
+    </div>
   </div>`;
 }
 
@@ -217,8 +280,14 @@ function renderGarment() {
 }
 
 /* =========================================================================
-   campaign screen
+   campaign screen - one publisher's garment
    ========================================================================= */
+
+/* "Women's gown", "men's suit" - the two facts a brand skims for. */
+function garmentLabel(L) {
+  return `${wornBy(L) === "male" ? "Men's" : "Women's"} ${garmentWord(L)}`;
+}
+
 function renderCampaign() {
   const L = state.listing;
   if (!L) return;
@@ -227,13 +296,18 @@ function renderCampaign() {
 
   /* hero ------------------------------------------------------------- */
   $("#hero-kicker").textContent = L.is_open
-    ? `Live auction · ${L.garment === "suit" ? "the suit" : "the dress"} · ${L.city || ""}`.trim()
+    ? [`Live`, garmentLabel(L).toLowerCase(), L.city].filter(Boolean).join(" · ")
     : "Bidding has not opened yet";
   $("#hero-h1").innerHTML = L.headline
     ? esc(L.headline)
-    : `Walking billboard <span class="grad">for your brand</span>`;
+    : `Walking billboard <em>for your brand</em>`;
   $("#hero-lead").textContent = L.tagline ||
-    `Your logo on ${esc(L.names || "the garment")}, worn all day, in every photograph taken.`;
+    `Your logo on ${L.names || "the garment"}, worn all day, in every photograph taken.`;
+
+  $("#hero-avatar").textContent = (L.names || "?").trim()[0] || "?";
+  $("#hero-who").textContent = L.names || "The publisher";
+  $("#hero-where").textContent =
+    [garmentLabel(L), L.city, L.event_date].filter(Boolean).join(" · ");
 
   /* goal ------------------------------------------------------------- */
   $("#goal-raised").textContent = money(c.raised);
@@ -256,22 +330,6 @@ function renderCampaign() {
   renderAbout();
   renderSocial();
   tickClock();
-  renderTicker(c);
-}
-
-/* the numbers strip under the header */
-function renderTicker(c) {
-  const L = state.listing;
-  const cells = [
-    ["Raised", money(c.raised), "m"],
-    ["Spots open", `${c.open}/${c.total}`, "a"],
-    ["Bids", String(state.bids.length), ""],
-    ["Highest", money(Math.max(0, ...state.spots.map(s =>
-      Store.market(s, Store.bids.bySpot(state.bids)[s.id]).price))), "g"],
-    ["Closes", Market.countdown(L.closes_at), "m"],
-  ];
-  $("#tick").innerHTML = cells.map(([k, v, cls]) =>
-    `<div class="c"><span class="k">${esc(k)}</span><span class="v ${cls}">${esc(v)}</span></div>`).join("");
 }
 
 /* the list of spots, grouped front then back */
@@ -280,7 +338,7 @@ function renderSpotList(bySpot) {
   const html = sides.map(side => {
     const rows = state.spots.filter(s => s.side === side);
     if (!rows.length) return "";
-    return `<div class="side-hd"><p class="lbl">${side} of the ${esc(state.listing.garment)}</p>
+    return `<div class="side-hd"><p class="lbl">${side} of the ${esc(garmentWord(state.listing))}</p>
               <span class="pill">${rows.length} spot${rows.length === 1 ? "" : "s"}</span></div>` +
       rows.map(s => {
         const st = Store.market(s, bySpot[s.id]);
@@ -318,11 +376,11 @@ function renderFeature(bySpot) {
 
   $("#feature").innerHTML = `
     <p class="lbl">Only one exists</p>
-    <h2 style="margin-top:10px">${esc(s.name)} — <span class="grad">${money(st.holder ? min : st.price)}</span></h2>
+    <h2 style="margin-top:10px">${esc(s.name)} — <em>${money(st.holder ? min : st.price)}</em></h2>
     <p class="lead" style="margin-top:14px">${esc(s.blurb || "")}</p>
     <ul>
       <li>A dedicated piece of content for your brand alone</li>
-      <li>The largest single area on the ${esc(s.side)} of the ${esc(state.listing.garment)}</li>
+      <li>The largest single area on the ${esc(s.side)} of the ${esc(garmentWord(state.listing))}</li>
       <li>Guaranteed thumbnail placement in the recap video</li>
       <li>${st.holder ? `Currently held by ${esc(st.holderName || "a brand")} at ${money(st.price)} — it is still takeable`
                       : `Position ${+s.n} on the ${esc(s.side)}. Nobody has it yet.`}</li>
@@ -355,38 +413,55 @@ function renderWall(bySpot) {
     : `<div class="slot blank" style="grid-column:1/-1;aspect-ratio:auto;padding:34px">Nobody yet. Be the first mark on it.</div>`;
 }
 
-/* the day itself, with the audience workings shown rather than one number */
+/* The day itself. Four figures rather than the full arithmetic - the workings
+   are one tap away in the sheet, which keeps the page from turning into a
+   spreadsheet for the nine readers in ten who only want the headline. */
 function renderEventCard(c) {
   const L = state.listing;
   const a = audience(L);
   const cpm = a.total > 0 ? (c.raised / a.total) * 1000 : 0;
 
+  const figures = [
+    ["In the room", num(L.confirmed || 0), "confirmed guests"],
+    ["Impressions", num(a.total), "conservatively"],
+    ["Cost per thousand", money(cpm, { cents: true }), "at today's prices"],
+    ["Spots open", `${c.open}/${c.total}`, "still unclaimed"],
+  ];
+
   $("#event-card").innerHTML = `
     <p class="lbl">The day</p>
-    <h2 style="margin-top:10px">${esc(L.venue || "The wedding")}${L.city ? ` · ${esc(L.city)}` : ""}</h2>
+    <h2 style="margin-top:10px">${esc(L.venue || "The day itself")}${L.city ? ` · ${esc(L.city)}` : ""}</h2>
     <p class="lead" style="margin-top:14px">
-      ${esc(L.confirmed || 0)} confirmed of ${esc(L.invited || 0)} invited${L.venue_type ? `, ${esc(L.venue_type)}` : ""}.
-      ${L.shooters ? `Shot by ${esc(L.shooters)}. ` : ""}${L.livestream ? "The ceremony is being livestreamed. " : ""}
+      ${esc(String(L.confirmed || 0))} confirmed of ${esc(String(L.invited || 0))} invited${L.venue_type ? `, ${esc(L.venue_type)}` : ""}.
+      ${L.shooters ? `Shot by ${esc(L.shooters)}. ` : ""}${L.livestream ? "It is being livestreamed. " : ""}
       ${L.press ? esc(L.press) + "." : ""}
     </p>
-    <div class="tbl-scroll" style="margin-top:22px">
-      <table class="tbl">
-        <thead><tr><th>Where the impressions come from</th><th style="text-align:end">Estimate</th></tr></thead>
-        <tbody>
-          <tr><td data-k="In the room">In the room — ${num(L.confirmed || 0)} guests × 12 exposures across the day</td>
-              <td data-k="Estimate" class="num" style="text-align:end">${num(a.inRoom)}</td></tr>
-          <tr><td data-k="Social + gallery">Social and the gallery — ${num(L.reach || 0)} reach × the 15% that actually surfaces</td>
-              <td data-k="Estimate" class="num" style="text-align:end">${num(a.social)}</td></tr>
-          ${a.livestream ? `<tr><td data-k="Livestream">Livestream</td>
-              <td data-k="Estimate" class="num" style="text-align:end">${num(a.livestream)}</td></tr>` : ""}
-          <tr><td data-k="Total"><b>Total, deliberately conservative</b></td>
-              <td data-k="Total" class="num" style="text-align:end"><b>${num(a.total)}</b></td></tr>
-          <tr><td data-k="Cost per thousand"><b>Cost per thousand at the current clearing price</b></td>
-              <td data-k="CPM" class="num" style="text-align:end"><b>${money(cpm, { cents: true })}</b></td></tr>
-        </tbody>
-      </table>
+    <div class="stats" style="margin-top:26px;margin-bottom:0">
+      ${figures.map(([k, v, d]) =>
+        `<div class="stat"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d">${esc(d)}</div></div>`).join("")}
     </div>
-    ${L.hashtag ? `<p class="hint" style="margin-top:14px">Everything goes out under <b>${esc(L.hashtag)}</b>.</p>` : ""}`;
+    <div class="chips" style="margin-top:22px">
+      <button class="btn ghost sm" id="event-workings">How that is worked out</button>
+      ${L.hashtag ? `<span class="hint">Everything goes out under <b>${esc(L.hashtag)}</b>.</span>` : ""}
+    </div>`;
+
+  $("#event-workings").addEventListener("click", () => openSheet({
+    kicker: "The audience",
+    title: "Where the impressions come from",
+    body: `
+      <div class="quote">
+        <div class="ln"><span class="k">In the room — ${num(L.confirmed || 0)} guests × 12 exposures across the day</span>
+          <span class="v">${num(a.inRoom)}</span></div>
+        <div class="ln"><span class="k">Social and the gallery — ${num(L.reach || 0)} reach × the 15% that actually surfaces</span>
+          <span class="v">${num(a.social)}</span></div>
+        ${a.livestream ? `<div class="ln"><span class="k">Livestream</span><span class="v">${num(a.livestream)}</span></div>` : ""}
+        <div class="ln tot"><span class="k">Total, deliberately conservative</span><span class="v">${num(a.total)}</span></div>
+        <div class="ln tot"><span class="k">Cost per thousand at the current clearing price</span>
+          <span class="v">${money(cpm, { cents: true })}</span></div>
+      </div>
+      <p class="hint" style="margin-top:16px">Every multiplier above is deliberately pessimistic. We would
+        rather a brand be pleasantly surprised than sold a number we cannot stand behind.</p>`,
+  }));
 }
 
 function audience(L) {
@@ -399,12 +474,8 @@ function audience(L) {
 function renderAbout() {
   const L = state.listing;
   $("#about-card").innerHTML = `
-    <div style="width:96px;height:96px;border-radius:50%;flex:none;border:2px solid var(--edge);
-                background:linear-gradient(135deg,var(--magenta),var(--amber));
-                display:flex;align-items:center;justify-content:center;
-                font-family:'Bodoni Moda',serif;font-size:2rem;color:#20081A">
-      ${esc((L.names || "?").trim()[0] || "?")}</div>
-    <div>
+    <div class="avatar lg">${esc((L.names || "?").trim()[0] || "?")}</div>
+    <div style="flex:1 1 320px">
       <p class="lbl">About</p>
       <h2 style="margin-top:8px">${esc(L.names || "The publisher")}</h2>
       <p class="lead" style="margin-top:14px">${esc(L.about || "")}</p>
@@ -449,12 +520,9 @@ function openChat() {
       const paint = rows => {
         log.innerHTML = rows.length ? rows.map(m => {
           const meName = user && (m.author === user.id || m.who === (user.brand || user.name));
-          return `<div style="justify-self:${meName ? "end" : "start"};max-width:85%;
-                        border:1px solid var(--edge-soft);border-radius:var(--r);
-                        padding:9px 12px;background:rgba(0,0,0,${meName ? ".18" : ".3"})">
-            <div class="lbl" style="font-size:.58rem;margin-bottom:4px">
-              ${esc(m.display_name || m.who || "someone")}${m.role === "client" ? " · publisher" : ""}</div>
-            <div style="font-size:.9rem;line-height:1.45">${esc(m.body || m.text || "")}</div>
+          return `<div class="bubble${meName ? " me" : ""}">
+            <div class="lbl">${esc(m.display_name || m.who || "someone")}${m.role === "client" ? " · publisher" : ""}</div>
+            <div class="msg">${esc(m.body || m.text || "")}</div>
           </div>`;
         }).join("") : `<p class="hint" style="text-align:center;padding:20px">No questions yet. Ask the first one.</p>`;
         log.scrollTop = log.scrollHeight;
@@ -511,7 +579,10 @@ function renderSocial() {
 function shareUrl(spot) {
   const u = new URL(location.href);
   u.hash = "";
-  u.searchParams.set("l", state.listing.id);
+  u.search = "";
+  /* The footer carries a share button on every screen, and the front door has
+     no listing to point at - so from there this shares the marketplace. */
+  if (state.listing) u.searchParams.set("l", state.listing.id);
   if (spot) u.searchParams.set("spot", spot.id);
   return u.toString();
 }
@@ -519,9 +590,11 @@ function shareUrl(spot) {
 function openShare(spot) {
   const L = state.listing;
   const url = shareUrl(spot);
-  const text = spot
-    ? `Spot ${String(+spot.n).padStart(2, "0")} — ${spot.name} — on ${L.names}'s ${L.garment}. Bidding is open.`
-    : `${L.names} are selling advertising space on ${L.garment === "suit" ? "the suit" : "the dress"}. Numbered spots, open bidding.`;
+  const text = !L
+    ? "Square Inch — publishers sell numbered advertising spots on a gown or a suit, and brands bid on them."
+    : spot
+      ? `Spot ${String(+spot.n).padStart(2, "0")} — ${spot.name} — on ${L.names}'s ${garmentWord(L)}. Bidding is open.`
+      : `${L.names} are selling advertising space on the ${garmentWord(L)}. Numbered spots, open bidding.`;
 
   const x = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
 
@@ -550,7 +623,7 @@ function openShare(spot) {
       $("#sh-copy", root).addEventListener("click", copy);
       $("#sh-ig", root).addEventListener("click", async () => {
         await copy();
-        window.open(L.instagram ? `https://instagram.com/${encodeURIComponent(L.instagram)}` : "https://instagram.com", "_blank", "noopener");
+        window.open(L && L.instagram ? `https://instagram.com/${encodeURIComponent(L.instagram)}` : "https://instagram.com", "_blank", "noopener");
       });
     },
   });
@@ -727,72 +800,147 @@ function openBid(spotId) {
 /* =========================================================================
    routing
    ========================================================================= */
-const SCREENS = ["campaign", "book", "auth", "studio"];
+const SCREENS = ["home", "browse", "campaign", "auth", "studio"];
 let authNext = null;
 
 function go(screen, opts = {}) {
   state.screen = screen;
   SCREENS.forEach(s => { $("#screen-" + s).hidden = s !== screen; });
-  $("#actionbar").classList.toggle("show", screen === "campaign" && !!state.selected);
-  document.body.classList.toggle("has-actionbar", screen === "campaign" && !!state.selected);
-  $("#navlinks").style.visibility = screen === "campaign" ? "" : "hidden";
+  const bar = screen === "campaign" && !!state.selected;
+  $("#actionbar").classList.toggle("show", bar);
+  document.body.classList.toggle("has-actionbar", bar);
   closeMobNav();
-  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+  if (!opts.keepScroll) window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
 
   if (screen === "auth") {
     authNext = opts.next || null;
     if (opts.role) setRole(opts.role);
   }
-  if (screen === "book") renderBook();
+  if (screen === "home") renderHome();
+  if (screen === "browse") renderBrowse();
   if (screen === "studio") renderStudio();
 }
 
 /* =========================================================================
-   the book
+   the directory
+
+   Both the front door and the browse screen are a grid of the same card, so
+   they are drawn by the same two functions. `directory()` is the only thing
+   that touches the network; it is cached for the session because a listing
+   does not appear or vanish while somebody is looking at the page.
    ========================================================================= */
-async function renderBook() {
-  const grid = $("#book-grid");
-  grid.innerHTML = `<div class="empty-state"><span class="spin" style="margin:0 auto"></span></div>`;
+async function directory({ fresh = false } = {}) {
+  if (state.directory.length && !fresh) return state.directory;
   let all = [];
   try { all = await Store.listings.list({ openOnly: true }); }
-  catch (e) { toast(e.message, "bad"); }
+  catch (e) { toast(e.message, "bad"); return []; }
 
-  const q = $("#book-search").value.trim().toLowerCase();
-  const rows = all.filter(l => !q ||
-    [l.names, l.city, l.venue].filter(Boolean).join(" ").toLowerCase().includes(q));
-
-  if (!rows.length) {
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>Nothing open</h3>
-      <p>No garment is taking bids right now.</p></div>`;
-    return;
-  }
-
-  const cards = await Promise.all(rows.map(async l => {
+  /* One round trip per listing, in parallel, so a card can show what has been
+     raised rather than just a photograph. */
+  state.directory = await Promise.all(all.map(async l => {
     let spots = [], bids = [];
-    try { [spots, bids] = await Promise.all([Store.spots.list(l.id), Store.bids.list(l.id)]); } catch { /* keep the card */ }
-    const c = Store.campaign(spots, Store.bids.bySpot(bids), l.goal);
-    const photo = safeUrl(l.photo_front);
-    return `<button class="lot" data-listing="${esc(l.id)}">
-      <div class="shot">${photo
-        ? `<img src="${esc(photo)}" alt="" loading="lazy">`
-        : `<div style="display:grid;place-items:center;height:100%">${silhouetteSvg(l.garment, "front")}</div>`}</div>
-      <div class="body">
-        <h3>${esc(l.names)}</h3>
-        <p class="meta">${esc(l.city || "")}${l.event_date ? ` · ${esc(l.event_date)}` : ""} · ${esc(l.garment)}</p>
-        <div class="foot-line">
-          <span>${money(c.raised)} / ${money(c.goal)}</span>
-          <span style="color:var(--aqua)">${c.open} open</span>
-        </div>
-      </div></button>`;
+    try { [spots, bids] = await Promise.all([Store.spots.list(l.id), Store.bids.list(l.id)]); }
+    catch { /* a listing whose spots we cannot read still belongs on the page */ }
+    return { l, spots, bids, c: Store.campaign(spots, Store.bids.bySpot(bids), l.goal) };
   }));
+  return state.directory;
+}
 
-  grid.innerHTML = cards.join("");
-  $$("#book-grid .lot").forEach(b => b.addEventListener("click", async () => {
+function lotCard({ l, spots, bids, c }) {
+  const photo = safeUrl(l.photo_front);
+  const from = spots.length
+    ? Math.min(...spots.map(s => Store.minimum(s, Store.bids.bySpot(bids)[s.id])))
+    : 0;
+  return `<button class="lot" data-listing="${esc(l.id)}">
+    <div class="shot">
+      ${photo
+        ? `<img src="${esc(photo)}" alt="" loading="lazy">`
+        : silhouetteSvg(l.garment, "front", wornBy(l))}
+      <div class="tags">
+        <span class="pill">${esc(garmentLabel(l))}</span>
+        ${c.open ? `<span class="pill live">${c.open} open</span>` : `<span class="pill hot">All taken</span>`}
+      </div>
+    </div>
+    <div class="body">
+      <h3>${esc(l.names || "A publisher")}</h3>
+      <p class="meta">${esc([l.city, l.event_date].filter(Boolean).join(" · ") || "Date to come")}</p>
+      <div class="meter"><i style="width:${(c.pct * 100).toFixed(1)}%"></i></div>
+      <div class="foot-line">
+        <span>${money(c.raised)} / ${money(c.goal)}</span>
+        <span class="open">${from ? `from ${money(from)}` : "no spots yet"}</span>
+      </div>
+    </div></button>`;
+}
+
+/* Every grid of lots behaves the same: click one, open it. */
+function wireLots(root) {
+  $$(".lot", root).forEach(b => b.addEventListener("click", async () => {
     await load(b.dataset.listing);
     go("campaign");
   }));
 }
-$("#book-search").addEventListener("input", debounce(renderBook, 220));
+
+const SPINNER = `<div class="empty-state" style="grid-column:1/-1"><span class="spin"></span></div>`;
+
+/* ------------------------------------------------------------- front door */
+async function renderHome() {
+  const grid = $("#home-featured");
+  const preview = $("#home-preview");
+  grid.innerHTML = SPINNER;
+
+  const rows = await directory();
+  if (!rows.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>Nobody is listed yet</h3>
+      <p>Be the first. Open a publisher account and put your garment up.</p></div>`;
+    preview.innerHTML = "";
+    return;
+  }
+
+  /* The fullest campaign makes the best advertisement for the idea. One panel,
+     not two - at hero size a pair is too small for the price chips to be read,
+     which is the one thing the preview exists to show. */
+  const best = rows.slice().sort((a, b) => b.c.pct - a.c.pct)[0];
+  preview.className = "garment-wrap solo";
+  preview.innerHTML = garmentPanel("front", {
+    listing: best.l, spots: best.spots, bids: best.bids, interactive: false,
+  });
+
+  grid.innerHTML = rows.slice(0, 3).map(lotCard).join("");
+  wireLots(grid);
+}
+
+/* --------------------------------------------------------- browse screen */
+function matchesFilter(l, filter) {
+  if (filter === "all") return true;
+  if (filter === "gown" || filter === "suit") return l.garment === filter;
+  return wornBy(l) === filter;
+}
+
+async function renderBrowse() {
+  const grid = $("#browse-grid");
+  grid.innerHTML = SPINNER;
+
+  const rows = await directory();
+  const q = $("#browse-search").value.trim().toLowerCase();
+  const shown = rows.filter(({ l }) =>
+    matchesFilter(l, state.filter) &&
+    (!q || [l.names, l.city, l.venue, l.headline].filter(Boolean).join(" ").toLowerCase().includes(q)));
+
+  $("#browse-count").textContent = `${shown.length} of ${rows.length}`;
+
+  grid.innerHTML = shown.length
+    ? shown.map(lotCard).join("")
+    : `<div class="empty-state" style="grid-column:1/-1"><h3>Nothing matches</h3>
+       <p>Try another search, or drop the filter.</p></div>`;
+  wireLots(grid);
+}
+
+$("#browse-search").addEventListener("input", debounce(renderBrowse, 220));
+$$("[data-filter]").forEach(b => b.addEventListener("click", () => {
+  state.filter = b.dataset.filter;
+  $$("[data-filter]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  renderBrowse();
+}));
 
 /* =========================================================================
    auth
@@ -804,10 +952,9 @@ function setRole(role) {
   $("#role-client").setAttribute("aria-pressed", String(role === "client"));
   $("#role-brand").setAttribute("aria-pressed", String(role === "brand"));
   $("#au-brand-fld").hidden = role !== "brand";
-  $("#au-name-label").textContent = role === "client" ? "Your name" : "Your name";
   $("#auth-lead").textContent = role === "client"
-    ? "You list a garment, mark out the spots and set the floors."
-    : "You bid on spots and your mark goes on the garment.";
+    ? "You photograph a garment, mark out the spots on it and set a floor under each one."
+    : "You browse the publishers, buy a spot, and your mark goes on the garment.";
 }
 $("#role-client").addEventListener("click", () => setRole("client"));
 $("#role-brand").addEventListener("click", () => setRole("brand"));
@@ -860,9 +1007,12 @@ $("#auth-form").addEventListener("submit", async e => {
     if (!u) { toast("Check your email to confirm the account, then sign in.", "ok"); setAuthMode("in"); return; }
     toast(`Signed in as ${u.brand || u.name}.`, "ok");
     const next = authNext; authNext = null;
+    /* `next` is whatever the visitor was trying to do when we interrupted
+       them to sign in - almost always a bid, which needs its own listing
+       back on screen before the sheet can reopen. */
     if (next) { go("campaign"); next(); }
     else if (u.role === "client") await enterStudio();
-    else go("campaign");
+    else go("browse");
   } catch (e2) {
     err.textContent = e2.message; err.hidden = false;
   } finally {
@@ -891,12 +1041,12 @@ async function askRoleIfNeeded() {
 
       <div style="display:grid;gap:11px;margin-top:22px">
         <button class="btn ghost wide" data-role="client" style="justify-content:flex-start;text-align:start;height:auto;padding:16px 20px">
-          <span><b style="display:block">It's my garment</b>
-          <span style="color:var(--soft);font-size:.86rem">I'm selling space on a gown or a suit</span></span>
+          <span><b style="display:block">I'm a publisher</b>
+          <span style="color:var(--ink-2);font-size:.86rem">I'm selling space on a gown or a suit</span></span>
         </button>
         <button class="btn ghost wide" data-role="brand" style="justify-content:flex-start;text-align:start;height:auto;padding:16px 20px">
-          <span><b style="display:block">I'm buying</b>
-          <span style="color:var(--soft);font-size:.86rem">I want my brand on somebody's garment</span></span>
+          <span><b style="display:block">I'm a brand</b>
+          <span style="color:var(--ink-2);font-size:.86rem">I want my mark on somebody's garment</span></span>
         </button>
       </div>
 
@@ -949,11 +1099,17 @@ function renderAccount() {
   const right = $("#navright"), mob = $("#mob-account");
 
   if (!u) {
-    right.innerHTML = `<button class="btn sm" id="nav-get">Get a spot</button>`;
-    mob.innerHTML = `<button class="btn wide" id="mob-get">Get a spot</button>`;
-    const open = () => go("auth", { role: "brand" });
-    $("#nav-get").addEventListener("click", open);
-    $("#mob-get").addEventListener("click", open);
+    right.innerHTML = `
+      <button class="btn quiet sm" id="nav-in">Sign in</button>
+      <button class="btn sm" id="nav-get">Get a spot</button>`;
+    mob.innerHTML = `
+      <button class="btn ghost wide" id="mob-in">Sign in</button>
+      <button class="btn wide" id="mob-get">Get a spot</button>`;
+    $$("#nav-get, #mob-get").forEach(b => b.addEventListener("click", () => go("browse")));
+    $$("#nav-in, #mob-in").forEach(b => b.addEventListener("click", () => {
+      go("auth", { role: "brand" });
+      setAuthMode("in");
+    }));
     return;
   }
 
@@ -965,7 +1121,7 @@ function renderAccount() {
     ${u.role === "client" ? `<button class="btn ghost wide" id="mob-studio">My listing</button>` : ""}
     <button class="btn quiet wide" id="mob-out">${label} · Sign out</button>`;
 
-  const out = async () => { await Store.auth.signOut(); toast("Signed out."); go("campaign"); };
+  const out = async () => { await Store.auth.signOut(); toast("Signed out."); go("home"); };
   $$("#nav-out, #mob-out").forEach(b => b.addEventListener("click", out));
   $$("#nav-studio, #mob-studio").forEach(b => b.addEventListener("click", enterStudio));
 }
@@ -1035,6 +1191,7 @@ async function renderStudio() {
 
   /* forms */
   $("#t-garment").value = L.garment || "gown";
+  $("#t-wears").value = wornBy(L);
   $("#t-names").value = L.names || "";
   $("#t-city").value = L.city || "";
   $("#t-goal").value = L.goal || 0;
@@ -1280,6 +1437,7 @@ $("#terms-form").addEventListener("submit", async e => {
   try {
     await Store.listings.update(state.listing.id, {
       garment: $("#t-garment").value,
+      wears: $("#t-wears").value,
       names: $("#t-names").value.trim(),
       city: $("#t-city").value.trim(),
       goal: Number($("#t-goal").value) || 0,
@@ -1325,8 +1483,7 @@ $("#event-form").addEventListener("submit", async e => {
 
 $("#studio-view").addEventListener("click", () => go("campaign"));
 $("#studio-share").addEventListener("click", () => openShare(null));
-$("#studio-back").addEventListener("click", () => go("campaign"));
-$("#book-back").addEventListener("click", () => go("campaign"));
+$("#studio-back").addEventListener("click", () => go("home"));
 $("#hero-share").addEventListener("click", () => openShare(null));
 
 /* =========================================================================
@@ -1341,8 +1498,45 @@ function closeMobNav() {
   $("#burger").setAttribute("aria-expanded", "false");
 }
 $$("#mobnav a").forEach(a => a.addEventListener("click", closeMobNav));
-$("#home-link").addEventListener("click", () => go("campaign"));
-$$("#nav-book, #mob-book").forEach(b => b.addEventListener("click", () => go("book")));
+$("#home-link").addEventListener("click", () => go("home"));
+
+/* The publisher door. Where it lands depends on who is already signed in:
+   a publisher goes straight to their own listing, everyone else is asked to
+   open the right kind of account first. */
+async function startPublishing() {
+  const u = Store.auth.current();
+  if (u && u.role === "client") { await enterStudio(); return; }
+  if (u && u.role === "brand") {
+    toast("This account buys spots. Publishing needs a publisher account.");
+    return;
+  }
+  go("auth", { role: "client" });
+}
+
+function scrollHomeTo(id) {
+  const jump = () => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth" }); };
+  /* go() closes the burger on its own; jumping within a screen it has already
+     drawn does not, and the menu would stay open over what we scrolled to. */
+  if (state.screen === "home") { closeMobNav(); jump(); }
+  else { go("home"); setTimeout(jump, 60); }
+}
+
+const NAV = {
+  browse: () => go("browse"),
+  how: () => scrollHomeTo("home-how"),
+  publish: startPublishing,
+};
+$$("#nav-browse, #mob-browse, #door-brand, #home-seeall").forEach(b =>
+  b.addEventListener("click", NAV.browse));
+$$("#nav-how, #mob-how").forEach(b => b.addEventListener("click", NAV.how));
+$$("#nav-publish, #mob-publish, #door-publisher").forEach(b =>
+  b.addEventListener("click", NAV.publish));
+$("#campaign-back").addEventListener("click", () => go("browse"));
+
+$$("[data-nav]").forEach(a => a.addEventListener("click", e => {
+  e.preventDefault();
+  (NAV[a.dataset.nav] || NAV.browse)();
+}));
 
 $("#side-front").addEventListener("click", () => { state.side = "front"; syncSide(); });
 $("#side-back").addEventListener("click", () => { state.side = "back"; syncSide(); });
@@ -1384,6 +1578,9 @@ async function load(listingId) {
 }
 
 async function refresh() {
+  /* Anything that moves a bid or a listing also moves the directory, so the
+     cached copy of it goes stale here rather than staying wrong until reload. */
+  state.directory = [];
   if (!state.listing) return;
   const id = state.listing.id;
   try {
@@ -1399,6 +1596,8 @@ async function refresh() {
 function renderAll() {
   renderCampaign();
   if (state.screen === "studio") renderStudio();
+  if (state.screen === "home") renderHome();
+  if (state.screen === "browse") renderBrowse();
   renderAccount();
 }
 
@@ -1408,13 +1607,7 @@ function tickClock() {
   if (!L) return;
   $("#goal-clock").textContent = Market.countdown(L.closes_at);
 }
-setInterval(() => {
-  tickClock();
-  if (state.listing) {
-    const c = Store.campaign(state.spots, Store.bids.bySpot(state.bids), state.listing.goal);
-    renderTicker(c);
-  }
-}, 1000);
+setInterval(tickClock, 1000);
 
 /* reveal on scroll */
 const io = new IntersectionObserver(entries => {
@@ -1454,14 +1647,13 @@ function debounce(fn, ms) {
   if (params.get("paid") === "1") toast("Payment authorised. The spot is yours until someone beats it.", "ok");
   if (params.get("paid") === "0") toast("Checkout cancelled — no bid was placed.");
 
-  let id = params.get("l");
-  if (!id) {
-    const open = await Store.listings.list({ openOnly: false });
-    id = open.length ? open[0].id : null;
-  }
-  if (!id) { toast("No listings yet. Create an account as a publisher to make one.", ""); return; }
+  /* A link to one publisher opens that publisher. Everyone else lands on the
+     front door and says which side of the table they are on. */
+  const id = params.get("l");
+  if (!id) { go("home"); return; }
 
   await load(id);
+  go("campaign");
 
   const spotParam = params.get("spot");
   if (spotParam && state.spots.some(s => s.id === spotParam)) {

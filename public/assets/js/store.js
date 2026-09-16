@@ -17,7 +17,9 @@
 window.Store = (function () {
   "use strict";
 
-  const LS = "squareinch.v2";
+  /* Bumped when the demo seed changes shape: an old key would keep an
+     already-seeded browser on the previous single-listing demo for ever. */
+  const LS = "squareinch.v3";
   let mode = "demo";
   let sb = null;                 // the supabase client, when there is one
   let config = { publishableKey: null, currency: "usd", feePercent: 8, supabaseUrl: null, supabaseAnonKey: null };
@@ -95,8 +97,7 @@ window.Store = (function () {
     const d = db();
     if (d.seeded) return;
 
-    const listingId = "demo-mt";
-    const spots = [
+    const LAYOUT = [
       /* front */
       ["front", 1, "Mega Spot",     "MEGA",    1200, 23,   23,   27,   10,   "Top-front placement. In nearly every photograph, every video, every recap montage. This is the one people screenshot."],
       ["front", 2, "Semi-Mega",     null,       900, 24,   34,   31,    7.5, "Smaller than the Mega, but it sits on the front and comes out in almost every frame."],
@@ -112,35 +113,95 @@ window.Store = (function () {
       ["back",  5, "Slaying",       null,       700, 33,   66,   36.2, 10,   "A bottom spot, but a wide one - built to catch the room."],
       ["back",  6, "Mini",          null,       350, 29,   78.5, 20,   10.5, "Small budget, biggest room. This is the one for you."],
       ["back",  7, "Mini",          null,       350, 52,   78.5, 20,   10.5, "Small budget, biggest room. This is the one for you."],
-    ].map(([side, n, name, badge, floor, x, y, w, h, blurb]) => ({
-      id: `${listingId}-${side}-${n}`, listing_id: listingId, side, n, name, badge, floor, x, y, w, h, blurb,
-    }));
+    ];
 
-    const closes = Date.now() + 6 * 86400000;
+    /* A suit is a narrower canvas than a skirt, so the same layout is pulled
+       in towards the centre line rather than redrawn by hand. */
+    const narrowed = rows => rows.map(r => {
+      const [side, n, name, badge, floor, x, y, w, h, blurb] = r;
+      const k = 0.76, mid = 50;
+      return [side, n, name, badge, floor, mid + (x - mid) * k, y, w * k, h, blurb];
+    });
+
+    const spotsFor = (listingId, rows, priceMul) => rows.map(
+      ([side, n, name, badge, floor, x, y, w, h, blurb]) => ({
+        id: `${listingId}-${side}-${n}`, listing_id: listingId,
+        side, n, name, badge,
+        floor: Math.round(floor * priceMul / 25) * 25,
+        x: Math.round(x * 10) / 10, y, w: Math.round(w * 10) / 10, h, blurb,
+      }));
+
+    const day = n => new Date(Date.now() + n * 86400000).toISOString();
+    const dateOnly = n => day(n).slice(0, 10);
+
+    /* Three publishers rather than one, so the directory has something in it
+       the first time anybody opens the site with no database configured. */
+    const listings = [
+      {
+        id: "demo-mt", owner: "demo-owner",
+        names: "Maya & Tal", garment: "gown", wears: "female",
+        headline: "Walking billboard for your brand",
+        tagline: "your logo on my dress, worn all day at our wedding in Tel Aviv",
+        city: "Tel Aviv", venue: "Beit Hatfutsot", venue_type: "Garden, 180 covers",
+        event_date: dateOnly(7),
+        invited: 220, confirmed: 180, shooters: "Noa Levi + a second shooter",
+        gallery: "Public gallery, ~40k views on the last two weddings",
+        reach: 48000, hashtag: "#mayaandtal", press: "Local lifestyle press confirmed",
+        livestream: true,
+        goal: 9200, closes_at: day(6),
+        about: "I costed this wedding down to the napkin. The dress is the only line on the spreadsheet that can earn, so it is going to.",
+        instagram: "mayaandtal", twitter: "mayaandtal",
+        layout: LAYOUT, priceMul: 1,
+      },
+      {
+        id: "demo-ro", owner: "demo-owner-2",
+        names: "Roi Avital", garment: "suit", wears: "male",
+        headline: "Six hours on a stage, in your logo",
+        tagline: "best man at two weddings and on a conference panel in the same fortnight",
+        city: "Jerusalem", venue: "The Eden, then DevDay", venue_type: "Ballroom, 240 covers",
+        event_date: dateOnly(12),
+        invited: 260, confirmed: 240, shooters: "House photographer and a film crew",
+        gallery: "Conference posts the full gallery",
+        reach: 31000, hashtag: "#roiinasuit", press: "",
+        livestream: true,
+        goal: 6400, closes_at: day(10),
+        about: "I am going to be photographed for six hours whether or not anyone pays me for it. This seemed the obvious thing to do about that.",
+        instagram: "roiavital", twitter: "",
+        layout: narrowed(LAYOUT), priceMul: 0.8,
+      },
+      {
+        id: "demo-nl", owner: "demo-owner-3",
+        names: "Noa Lev", garment: "suit", wears: "female",
+        headline: "Keynote, front row, and the after-party",
+        tagline: "a tailored suit on a stage with 900 people in front of it",
+        city: "Haifa", venue: "Congress Centre", venue_type: "Auditorium, 900 seats",
+        event_date: dateOnly(21),
+        invited: 900, confirmed: 720, shooters: "Conference crew, four cameras",
+        gallery: "Recorded talk stays up permanently",
+        reach: 120000, hashtag: "#noalevkeynote", press: "Two trade titles confirmed",
+        livestream: true,
+        goal: 14000, closes_at: day(18),
+        about: "The talk will outlive the day. Whatever is on the jacket is in the thumbnail for as long as the video is up.",
+        instagram: "noalev", twitter: "noalev",
+        layout: narrowed(LAYOUT), priceMul: 1.4,
+      },
+    ];
+
+    const allSpots = [];
+    const rows = {};
+    for (const { layout, priceMul, ...L } of listings) {
+      rows[L.id] = Object.assign({
+        fee_percent: 8, currency: "usd", is_open: true,
+        photo_front: null, photo_back: null,
+      }, L);
+      allSpots.push(...spotsFor(L.id, layout, priceMul));
+    }
+
     save({
       seeded: true,
       users: {},
-      listings: {
-        [listingId]: {
-          id: listingId, owner: "demo-owner",
-          names: "Maya & Tal", garment: "gown",
-          headline: "Walking billboard for your brand",
-          tagline: "your logo on my dress, worn all day at our wedding in Tel Aviv",
-          city: "Tel Aviv", venue: "Beit Hatfutsot", venue_type: "Garden, 180 covers",
-          event_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-          invited: 220, confirmed: 180, shooters: "Noa Levi + a second shooter",
-          gallery: "Public gallery, ~40k views on the last two weddings",
-          reach: 48000, hashtag: "#mayaandtal", press: "Local lifestyle press confirmed",
-          livestream: true,
-          goal: 9200, fee_percent: 8, currency: "usd",
-          closes_at: new Date(closes).toISOString(),
-          is_open: true,
-          photo_front: null, photo_back: null,
-          about: "I costed this wedding down to the napkin. The dress is the only line on the spreadsheet that can earn, so it is going to.",
-          instagram: "mayaandtal", twitter: "mayaandtal",
-        },
-      },
-      spots: Object.fromEntries(spots.map(s => [s.id, s])),
+      listings: rows,
+      spots: Object.fromEntries(allSpots.map(s => [s.id, s])),
       bids: {},
       messages: {},
     });

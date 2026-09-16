@@ -5,11 +5,19 @@ suit, and brands bid for the positions that matter.
 
 **`index.html` is the product.** Open that one first.
 
-The page is laid out like a campaign, not like a dashboard: a headline, the
-garment with numbered spots on it, a funding bar, the list of spots, the one
-standout spot, social proof, how it works, the day itself, perks, who is behind
-it, and an FAQ. A brand can land on it cold and know what it costs by the second
-screenful.
+It is two-sided. The front door asks which side of the table you are on:
+
+- **Brands** go to the directory — every garment taking bids, filterable by
+  gown or suit and by women's or men's — and open the publisher whose room they
+  want to be in.
+- **Publishers** go to the studio, upload a front and a back photograph, drag
+  the spots out on the fabric and set a floor under each one.
+
+A publisher's own page is laid out like a campaign, not like a dashboard: a
+headline, the front and the back at full width with every position numbered and
+priced, a funding bar, the list of spots, the one standout spot, social proof,
+how it works, the day itself, perks, who is behind it, and an FAQ. A brand can
+land on it cold and know what it costs by the second screenful.
 
 ---
 
@@ -309,9 +317,14 @@ Point cron, a GitHub Action or a Supabase scheduled function at it.
 
 ## Gowns and suits, front and back
 
-A listing is a gown or a suit, and each has a **front and a back photograph** the
-publisher uploads. Spots are drawn on top by dragging a rectangle across the
-picture.
+A listing is a gown or a suit, and separately it is cut for a woman or for a
+man — `garment` and `wears` are two different columns because a woman wears a
+suit to her own keynote and a man wears a long coat. The pair decides the
+wording on the card ("Women's gown", "Men's suit"), the two filters in the
+directory, and which silhouette is drawn before a photograph exists.
+
+Each listing has a **front and a back photograph** the publisher uploads. Spots
+are drawn on top by dragging a rectangle across the picture.
 
 Coordinates are stored as **percentages of the photograph, never pixels**, so a
 layout drawn on a laptop lands in the same place on a phone, and replacing the
@@ -326,9 +339,13 @@ Mobile is the default and the desktop layout is what gets added on top, not the
 other way round.
 
 - One garment panel with a Front/Back toggle on a phone; both panels side by
-  side from 680px, at which point the toggle removes itself.
-- Spot labels scale with the spot they sit in (`cqw` container units) with a
-  floor so they never become unreadable.
+  side from 680px, at which point the toggle removes itself. The pair is capped
+  at 940px — at full page width a 3:4 panel is tall enough that you scroll past
+  the front to reach the back.
+- A spot's number sits in the corner of the box and its price hangs off the
+  bottom edge, both at a fixed size rather than scaled to the box — a small spot
+  would otherwise carry a price nobody can read, which is the one thing on the
+  garment that has to be legible.
 - Tables become card lists under 640px.
 - The bid dialog rises as a bottom sheet on a phone and is centred on a desktop.
 - A sticky action bar appears once a spot is selected, and only under 900px.
