@@ -156,8 +156,19 @@ if (CANONICAL_HOST) {
 }
 
 /* A liveness probe the host can poll without tripping rate limits or setting
-   a CSRF cookie on every check. */
-app.get("/healthz", (_req, res) => res.type("text/plain").send("ok"));
+   a CSRF cookie on every check. It also reports which commit is actually
+   running, which is the only reliable way to tell whether a push deployed -
+   a docs-only change looks identical in a browser otherwise. Render sets
+   RENDER_GIT_COMMIT itself; locally it is simply absent. */
+const STARTED_AT = new Date().toISOString();
+app.get("/healthz", (_req, res) => {
+  res.type("application/json").json({
+    ok: true,
+    commit: (process.env.RENDER_GIT_COMMIT || "local").slice(0, 7),
+    branch: process.env.RENDER_GIT_BRANCH || null,
+    startedAt: STARTED_AT,
+  });
+});
 
 /* ============================================================ the webhook
    Mounted before the JSON parser because the signature is over the raw body,

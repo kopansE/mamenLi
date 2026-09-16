@@ -1,0 +1,52 @@
+# Runs the suite on every push and pull request.
+#
+# Render deploys `main` on its own. This exists so a red build is visible
+# BEFORE you go looking at the site, and so Render's "Wait for CI to pass"
+# setting has something to wait for - turn that on and a failing test stops
+# the deploy instead of shipping it.
+#
+# No secrets are configured here on purpose. The Supabase integration suite
+# detects that and skips itself cleanly; the browser suite does the same when
+# Chrome is absent. Everything that does not need credentials still runs:
+# the auction engine, the HTTP contract, and engine/server parity.
+
+name: tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Two installs, matching the Render build command: the root holds dev
+      # tooling, server/ holds what actually runs. Installing only the root is
+      # how you get "Cannot find module 'dotenv'".
+      - name: Install
+        run: |
+          npm ci --omit=dev
+          npm --prefix server ci --omit=dev
+
+      - name: Test
+        run: npm test
+
+      # Cheap standing guard: the repo must never be servable as a whole.
+      # Serving the project root once exposed /.git/config, and with it every
+      # secret ever committed.
+      - name: The server must only serve public/
+        run: |
+          if grep -nE 'express\.static\(\s*ROOT' server/index.js; then
+            echo "::error::express.static is pointed at the repo root - it must be PUBLIC"
+            exit 1
+          fi
+          echo "ok: static root is not the repo root"
