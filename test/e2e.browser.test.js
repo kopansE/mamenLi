@@ -504,13 +504,18 @@ describe("the page in a real browser", SUITE_OPTS, () => {
       const page = await open({ screen: "home" });
       const m = await page.evaluate(`
         await new Promise(r => setTimeout(r, 700));
-        const shots = [...document.querySelectorAll(".showcase .shot img")];
+        /* Every slide is in the DOM at once - the track is shifted sideways
+           rather than rebuilt - so "what is on screen" is the first SLIDE,
+           not the first image on the page. */
+        const slide = document.querySelector(".slide");
+        const shots = [...slide.querySelectorAll(".garment-photo")];
         return {
           men: document.getElementById("show-male").getAttribute("aria-pressed"),
           women: document.getElementById("show-female").getAttribute("aria-pressed"),
           srcs: shots.map(i => i.getAttribute("src")),
           complete: shots.map(i => i.complete && i.naturalWidth > 0),
-          marks: [...document.querySelectorAll(".showcase .mark b")].map(b => b.textContent),
+          marks: [...slide.querySelectorAll(".mark img")].map(i => i.getAttribute("alt")),
+          logos: [...slide.querySelectorAll(".mark img")].map(i => i.getAttribute("src")),
           caption: document.getElementById("show-caption").textContent,
           dots: document.querySelectorAll("#show-dots [data-show]").length,
         };
@@ -533,7 +538,11 @@ describe("the page in a real browser", SUITE_OPTS, () => {
       assert.deepEqual(m.complete, [true, true], "a showcase photograph did not load");
 
       assert.equal(m.marks.length, 2, "the point of the picture is the logo on the cloth");
-      assert.ok(m.marks.every(t => t.trim().length), "a sponsor mark rendered with no name in it");
+      assert.ok(m.marks.every(t => t && t.trim().length),
+        "a sponsor patch rendered with no alt text, so it is invisible to a screen reader");
+      for (const src of m.logos) {
+        assert.ok(src.startsWith("/assets/logos/"), `a patch is loading artwork from ${src}`);
+      }
       assert.match(m.caption, /·/, "the caption should name who this is and where");
       assert.ok(m.dots >= 2, "there is more than one man to show, so there should be dots");
 
@@ -543,23 +552,26 @@ describe("the page in a real browser", SUITE_OPTS, () => {
     it("moves on by itself, and the women's tab shows women", async () => {
       const page = await open({ screen: "home" });
       const m = await page.evaluate(`
+        const track = document.getElementById("show-track");
         await new Promise(r => setTimeout(r, 700));
-        const first = document.querySelector(".showcase .shot img").getAttribute("src");
+        const first = track.style.transform;
 
-        /* The rotation is on a 3s timer. Wait it out rather than reaching in,
-           because the thing under test is that it happens without being asked. */
-        await new Promise(r => setTimeout(r, 3600));
-        const second = document.querySelector(".showcase .shot img").getAttribute("src");
+        /* Wait out the real interval rather than reaching in and calling the
+           advance directly - the thing under test is that it happens without
+           being asked. */
+        await new Promise(r => setTimeout(r, 4800));
+        const second = track.style.transform;
 
         document.getElementById("show-female").click();
         await new Promise(r => setTimeout(r, 400));
-        const women = [...document.querySelectorAll(".showcase .shot img")]
+        const women = [...document.querySelectorAll(".slide .garment-photo")]
           .map(i => i.getAttribute("src"));
         return { first, second, women,
                  pressed: document.getElementById("show-female").getAttribute("aria-pressed") };
       `);
 
-      assert.notEqual(m.second, m.first, "the showcase never advanced on its own");
+      assert.notEqual(m.second, m.first,
+        `the showcase never advanced on its own - the track stayed at ${m.first}`);
       assert.equal(m.pressed, "true");
 
       /* p1-p3 are the women in the set and p4-p5 the men. Switching tabs has to
@@ -590,14 +602,14 @@ describe("the page in a real browser", SUITE_OPTS, () => {
           homeVisible: !home.hidden,
           headline: (document.querySelector("#screen-home h1") || {}).textContent || "",
           doors: document.querySelectorAll(".door").length,
-          photos: document.querySelectorAll(".showcase .shot img").length,
+          photos: document.querySelectorAll(".slide .garment-photo").length,
         };
       `);
 
       assert.ok(m.homeVisible, "the front door was hidden, so the page rendered as blank");
       assert.match(m.headline, /\S/, "there was no headline on screen");
       assert.equal(m.doors, 2, "neither door was reachable");
-      assert.equal(m.photos, 2,
+      assert.ok(m.photos >= 2,
         "the showcase is drawn from constants, not the network, so it must survive this");
     });
   });

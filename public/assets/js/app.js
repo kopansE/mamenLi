@@ -1151,8 +1151,8 @@ async function renderHome() {
   /* The showcase is drawn first and from constants, never from the network,
      so the front door has a picture on it the instant the page exists. What
      is actually listed can take its time filling in underneath. */
-  renderShowcase();
-  restartShowcase();
+  buildShowcase();
+  setShowPaused(false);
 
   const grid = $("#home-featured");
   grid.innerHTML = SPINNER;
@@ -1172,36 +1172,36 @@ async function renderHome() {
    the showcase
 
    The front door has to answer "what is this?" before anybody reads a word,
-   and the only honest answer is a photograph of a person with somebody's logo
-   printed on them. So: the front and the back of the same person, side by
-   side, with marks on the cloth, cycling every few seconds through the men or
-   the women.
+   and the only answer that works is a photograph of a person with somebody
+   else's logo printed on them. So: the front and the back of one person, side
+   by side, sliding left to right through the men or the women.
 
-   Every rectangle below was placed against the actual photograph, on opaque
+   Every patch below was placed against the actual photograph, on opaque
    fabric, clear of hands, of bare arms, and of the sheer lace several of these
    gowns carry across the shoulders - see public/assets/garments/manifest.json,
    which records where the fabric really is in each frame. A logo on somebody's
    skin is the one thing this picture must never show.
 
-   The companies are real names used as illustration. Nobody here sponsors
-   anybody; the footer says so, and that line is not decoration.
+   Only `w` is given. The height comes from the logo's own proportions, because
+   the supplied artwork runs from a 2.3:1 wordmark to a perfect square and any
+   fixed box would crop or stretch one of them.
    ========================================================================= */
 const SHOWCASE = {
   male: [
     {
       person: "p4", name: "Roi Avital", where: "Jerusalem", garment: "suit",
-      /* jacket hangs open, so the front mark sits on the left panel rather
-         than the centre, which is tie and then waistcoat */
+      /* the jacket hangs open, so the front patch sits on the left panel
+         rather than the centre, which is tie and then waistcoat */
       marks: [
-        { side: "front", x: 39, y: 27, w: 15, h: 7, brand: "Stripe" },
-        { side: "back", x: 39, y: 27, w: 22, h: 12, brand: "Linear" },
+        { side: "front", x: 38, y: 28, w: 16, logo: "04_tiptop.png", brand: "TipTop" },
+        { side: "back", x: 39, y: 29, w: 24, logo: "02_lever_up.png", brand: "Lever Up" },
       ],
     },
     {
       person: "p5", name: "Amit Barak", where: "Ramat Gan", garment: "suit",
       marks: [
-        { side: "front", x: 36, y: 27, w: 15, h: 7, brand: "Notion" },
-        { side: "back", x: 39, y: 27, w: 22, h: 12, brand: "Figma" },
+        { side: "front", x: 36, y: 28, w: 16, logo: "06_cryptopolitan.png", brand: "Cryptopolitan" },
+        { side: "back", x: 41, y: 27, w: 18, logo: "12_riv.png", brand: "RIV" },
       ],
     },
   ],
@@ -1209,93 +1209,136 @@ const SHOWCASE = {
     {
       person: "p1", name: "Maya & Tal", where: "Tel Aviv", garment: "gown",
       /* the V neckline bottoms out at y31 and the sleeves are sheer, so the
-         chest mark starts below the V and stays inside the beaded panel */
+         chest patch starts below the V and stays inside the beaded panel */
       marks: [
-        { side: "front", x: 43, y: 33, w: 15, h: 7, brand: "Aesop" },
-        { side: "back", x: 39, y: 46, w: 22, h: 11, brand: "Monzo" },
+        { side: "front", x: 44, y: 33, w: 14, logo: "01_wave_logo.png", brand: "Wave" },
+        { side: "back", x: 41, y: 46, w: 18, logo: "10_blue_star.png", brand: "Blue Star" },
       ],
     },
     {
       person: "p2", name: "Dana Halevi", where: "Caesarea", garment: "gown",
       /* the whole back above the waist seam is illusion lace over skin */
       marks: [
-        { side: "front", x: 43, y: 41, w: 16, h: 8, brand: "Oatly" },
-        { side: "back", x: 38, y: 44, w: 24, h: 11, brand: "Spotify" },
+        { side: "front", x: 44, y: 42, w: 14, logo: "09_purple_frog.png", brand: "Purple Frog" },
+        { side: "back", x: 40, y: 45, w: 18, logo: "07_zvzzt.png", brand: "ZVZZT" },
       ],
     },
     {
       person: "p3", name: "Noa Lev", where: "Haifa", garment: "gown",
       /* plain matte satin between y24 and y36 - the best surface in the set */
       marks: [
-        { side: "front", x: 44, y: 26, w: 15, h: 8, brand: "Patagonia" },
-        { side: "back", x: 37, y: 46, w: 24, h: 12, brand: "Duolingo" },
+        { side: "front", x: 45, y: 27, w: 13, logo: "13_zara.svg", brand: "Zara" },
+        { side: "back", x: 39, y: 46, w: 18, logo: "14_redbull.svg", brand: "Red Bull" },
       ],
     },
   ],
 };
 
 const SHOW_MS = 3000;
-const show = { tab: "male", i: 0, timer: null, paused: false };
+const show = { tab: "male", i: 0, timer: null, paused: false, hovering: false };
 
 function showPanel(entry, side) {
   const marks = entry.marks.filter(m => m.side === side).map(m => `
-    <span class="mark" style="top:${m.y}%;left:${m.x}%;width:${m.w}%;height:${m.h}%">
-      <b>${esc(m.brand)}</b>
+    <span class="mark" style="top:${m.y}%;left:${m.x}%;width:${m.w}%">
+      <img src="/assets/logos/${esc(m.logo)}" alt="${esc(m.brand)}" loading="lazy" decoding="async">
     </span>`).join("");
   return `<figure class="shot">
-    <img src="/assets/garments/${entry.person}-${side}.jpg"
+    <img class="garment-photo" src="/assets/garments/${entry.person}-${side}.jpg"
          alt="${esc(entry.name)}, ${side}, with sponsors printed on the ${esc(entry.garment)}"
          loading="lazy" decoding="async">
     <span class="side-tag">${side}</span>${marks}
   </figure>`;
 }
 
-function renderShowcase() {
+/* The track holds every slide for this tab at once and is shifted sideways.
+   Rebuilding it on each step would make the move a redraw, not a slide - the
+   whole point is that the eye follows one picture out and the next one in. */
+function buildShowcase() {
   const list = SHOWCASE[show.tab];
-  const entry = list[show.i % list.length];
-
-  $("#showcase").innerHTML = showPanel(entry, "front") + showPanel(entry, "back");
-  $("#show-caption").textContent =
-    `${entry.name} · ${entry.where} — two sponsors, drawn and priced by area`;
+  $("#show-track").innerHTML = list.map(entry =>
+    `<div class="slide">${showPanel(entry, "front")}${showPanel(entry, "back")}</div>`).join("");
+  $("#show-track").style.setProperty("--slides", list.length);
 
   $("#show-dots").innerHTML = list.map((e, n) =>
-    `<button role="tab" aria-selected="${n === show.i % list.length}"
-       aria-label="${esc(e.name)}" data-show="${n}"></button>`).join("");
-  $$("#show-dots [data-show]").forEach(b => b.addEventListener("click", () => {
-    show.i = Number(b.dataset.show);
-    renderShowcase();
-    restartShowcase();
-  }));
+    `<button role="tab" aria-selected="false" aria-label="${esc(e.name)}" data-show="${n}"></button>`).join("");
+  $$("#show-dots [data-show]").forEach(b =>
+    b.addEventListener("click", () => goShow(Number(b.dataset.show))));
 
   $("#show-male").setAttribute("aria-pressed", String(show.tab === "male"));
   $("#show-female").setAttribute("aria-pressed", String(show.tab === "female"));
+  paintShowcase();
 }
 
+/* Only the transform and the labels move between slides. */
+function paintShowcase() {
+  const list = SHOWCASE[show.tab];
+  const entry = list[show.i];
+  $("#show-track").style.transform = `translateX(-${show.i * (100 / list.length)}%)`;
+  $("#show-caption").textContent =
+    `${entry.name} · ${entry.where} — two sponsors, drawn and priced by area`;
+  $$("#show-dots [data-show]").forEach((b, n) =>
+    b.setAttribute("aria-selected", String(n === show.i)));
+}
+
+function goShow(i) {
+  const list = SHOWCASE[show.tab];
+  show.i = (i + list.length) % list.length;
+  paintShowcase();
+  restartShowcase();          // a deliberate move resets the clock
+}
+const nextShow = () => goShow(show.i + 1);
+const prevShow = () => goShow(show.i - 1);
+
 /* Rotation stops while somebody is looking at one deliberately - a picture
-   that moves under the cursor is a picture nobody can study. */
+   that moves under the cursor is a picture nobody can study - and stops for
+   good if they press pause. */
 function restartShowcase() {
   clearInterval(show.timer);
+  if (show.paused) return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   show.timer = setInterval(() => {
-    if (show.paused || document.hidden) return;
-    show.i = (show.i + 1) % SHOWCASE[show.tab].length;
-    renderShowcase();
+    if (show.hovering || document.hidden) return;
+    const list = SHOWCASE[show.tab];
+    show.i = (show.i + 1) % list.length;
+    paintShowcase();
   }, SHOW_MS);
+}
+
+function setShowPaused(on) {
+  show.paused = !!on;
+  const btn = $("#show-pause");
+  btn.setAttribute("aria-pressed", String(show.paused));
+  btn.setAttribute("aria-label", show.paused ? "Play" : "Pause");
+  btn.innerHTML = show.paused
+    ? `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>`
+    : `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>`;
+  restartShowcase();
 }
 
 function setShowTab(tab) {
   show.tab = tab;
   show.i = 0;
-  renderShowcase();
+  buildShowcase();
   restartShowcase();
 }
 
 $("#show-male").addEventListener("click", () => setShowTab("male"));
 $("#show-female").addEventListener("click", () => setShowTab("female"));
-$("#showcase").addEventListener("pointerenter", () => { show.paused = true; });
-$("#showcase").addEventListener("pointerleave", () => { show.paused = false; });
-$("#showcase").addEventListener("focusin", () => { show.paused = true; });
-$("#showcase").addEventListener("focusout", () => { show.paused = false; });
+$("#show-prev").addEventListener("click", prevShow);
+$("#show-next").addEventListener("click", nextShow);
+$("#show-pause").addEventListener("click", () => setShowPaused(!show.paused));
+
+$("#showcase").addEventListener("pointerenter", () => { show.hovering = true; });
+$("#showcase").addEventListener("pointerleave", () => { show.hovering = false; });
+$("#showcase").addEventListener("focusin", () => { show.hovering = true; });
+$("#showcase").addEventListener("focusout", () => { show.hovering = false; });
+
+/* Arrow keys work once the carousel has focus, which is what a keyboard user
+   reaches for before they find the buttons. */
+$("#showcase").addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") { e.preventDefault(); nextShow(); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); prevShow(); }
+});
 
 /* --------------------------------------------------------- browse screen */
 function matchesFilter(l, filter) {

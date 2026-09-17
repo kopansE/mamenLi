@@ -67,33 +67,47 @@
 <main id="screen-home">
 
   <section class="wrap hero">
-    <div class="hero-grid">
-      <div>
-        <p class="lbl">Advertising space you can walk around in</p>
-        <h1>Walking billboards, <em>by the spot</em></h1>
-        <p class="lead">Somebody is about to spend a whole day being photographed. They post the front and
-          the back of what they are wearing and put a price on the fabric. You drag out the patch you want,
-          and what it costs follows how much of them you are covering.</p>
+    <div class="hero-copy" style="max-width:56ch">
+      <p class="lbl">Advertising space you can walk around in</p>
+      <h1>Walking billboards, <em>by the spot</em></h1>
+      <p class="lead">Somebody is about to spend a whole day being photographed. They post the front and
+        the back of what they are wearing and put a price on the fabric. You drag out the patch you want,
+        and what it costs follows how much of them you are covering.</p>
+    </div>
+  </section>
+
+  <!-- The examples. These are what a client is shown, so they get the whole
+       width rather than half a hero column. -->
+  <section class="wrap" style="padding-bottom:var(--band)">
+    <div class="garment-side">
+      <div class="seg" id="show-tabs" role="group" aria-label="Whose garment to show">
+        <button type="button" id="show-male" aria-pressed="true">Men</button>
+        <button type="button" id="show-female" aria-pressed="false">Women</button>
       </div>
-
-      <div>
-        <div class="garment-side">
-          <div class="seg" id="show-tabs" role="group" aria-label="Whose garment to show">
-            <button type="button" id="show-male" aria-pressed="true">Men</button>
-            <button type="button" id="show-female" aria-pressed="false">Women</button>
-          </div>
-          <span class="lbl" style="margin-inline-start:auto">An example listing</span>
-        </div>
-
-        <div class="showcase" id="showcase" aria-live="off"></div>
-
-        <div class="showcase-foot">
-          <p class="hint" id="show-caption">—</p>
-          <div class="dots" id="show-dots" role="tablist" aria-label="Which example"></div>
-        </div>
-      </div>
+      <span class="lbl" style="margin-inline-start:auto">An example listing</span>
     </div>
 
+    <div class="showcase" id="showcase" tabindex="0" role="group" aria-label="Example listings">
+      <div class="track" id="show-track"></div>
+
+      <button class="showarrow prev" id="show-prev" aria-label="Previous example">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 1.5 4 8l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="showarrow next" id="show-next" aria-label="Next example">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 1.5 12 8l-6.5 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <div class="showcase-foot">
+      <button class="showpause" id="show-pause" aria-pressed="false" aria-label="Pause">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>
+      </button>
+      <p class="hint" id="show-caption">—</p>
+      <div class="dots" id="show-dots" role="tablist" aria-label="Which example"></div>
+    </div>
+  </section>
+
+  <section class="wrap band tight">
     <!-- which side of the table -->
     <div class="doors">
       <button class="door" id="door-brand">
@@ -594,7 +608,7 @@
     </div>
     <div class="legal">
       <span id="foot-mode">Demo mode</span>
-      <span>Every company, bid and figure on this page is invented. No real one is depicted.</span>
+      <span>The sponsorships, bids and figures here are illustrative. No brand shown is affiliated with this site or endorses it.</span>
     </div>
   </div>
 </footer>
