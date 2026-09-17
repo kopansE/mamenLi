@@ -1223,114 +1223,119 @@ const PHOTO = {
   "p2-front": [1396, 1536], "p2-back": [1396, 1536],
   "p3-front": [1396, 1536], "p3-back": [1396, 1536],
   "p4-front": [1266, 1536], "p4-back": [1381, 1536],
-  "p5-front": [1357, 1536], "p5-back": [1376, 1536],
+  "p5-front": [1381, 1536], "p5-back": [1381, 1536],
 };
 
 const SHOWCASE = {
   male: [
     {
       person: "p4", name: "Roi Avital", where: "Jerusalem", garment: "suit",
+      rate: 2870, frontX: 1.55,
       /* Near-black navy, so every mark on it has light ink. The jacket hangs
          open, which rules out the centre line - tie down to y30, then
          waistcoat - and the trousers separate below y59. */
       marks: [
-        { side: "front", x: 46.9, y: 32.4, w: 12, logo: "mcdonalds.png", brand: "McDonald's" },
-        { side: "front", x: 55, y: 42.6, w: 9.5, logo: "pepsi.png", brand: "Pepsi" },
-        { side: "front", x: 46.9, y: 44.1, w: 6.5, logo: "spotify.png", brand: "Spotify" },
-        { side: "front", x: 55, y: 52.3, w: 9, logo: "osem.png", brand: "Osem" },
-        { side: "front", x: 46, y: 59.4, w: 6, logo: "sano.png", brand: "Sano" },
-        { side: "front", x: 46, y: 67.6, w: 5, logo: "strauss.png", brand: "Strauss" },
+        { side: "front", x: 46.9, y: 32.4, w: 12, h: 8.7, logo: "mcdonalds.png", brand: "McDonald's" },
+        { side: "front", x: 55, y: 42.6, w: 9.5, h: 7.8, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "front", x: 46.9, y: 44.1, w: 6.5, h: 5.3, logo: "spotify.png", brand: "Spotify" },
+        { side: "front", x: 55, y: 52.3, w: 9, h: 3.5, logo: "osem.png", brand: "Osem" },
+        { side: "front", x: 46, y: 59.4, w: 6, h: 5, logo: "sano.png", brand: "Sano" },
+        { side: "front", x: 46, y: 67.6, w: 5, h: 2.8, logo: "strauss.png", brand: "Strauss" },
 
-        { side: "back", x: 41.1, y: 21.4, w: 12, logo: "sano.png", brand: "Sano" },
-        { side: "back", x: 45.1, y: 33.7, w: 11, logo: "strauss.png", brand: "Strauss" },
-        { side: "back", x: 41.1, y: 41.9, w: 10, logo: "redbull.png", brand: "Red Bull" },
-        { side: "back", x: 47.1, y: 48.8, w: 9, logo: "mcdonalds.png", brand: "McDonald's" },
-        { side: "back", x: 39.5, y: 59.7, w: 5.5, logo: "pepsi.png", brand: "Pepsi" },
-        { side: "back", x: 52.2, y: 62.4, w: 5, logo: "spotify.png", brand: "Spotify" },
+        { side: "back", x: 41.1, y: 21.4, w: 12, h: 10.9, logo: "sano.png", brand: "Sano" },
+        { side: "back", x: 45.1, y: 33.7, w: 11, h: 6.8, logo: "strauss.png", brand: "Strauss" },
+        { side: "back", x: 41.1, y: 41.9, w: 10, h: 5.5, logo: "redbull.png", brand: "Red Bull" },
+        { side: "back", x: 47.1, y: 48.8, w: 9, h: 7, logo: "mcdonalds.png", brand: "McDonald's" },
+        { side: "back", x: 39.5, y: 59.7, w: 5.5, h: 4.9, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "back", x: 52.2, y: 62.4, w: 5, h: 4.5, logo: "spotify.png", brand: "Spotify" },
       ],
     },
     {
       person: "p5", name: "Amit Barak", where: "Ramat Gan", garment: "suit",
+      rate: 3180, frontX: 1.7,
       /* Mid-grey, the only cloth in the set that takes a light mark and a dark
          one equally well, so this is the garment that carries all twelve. */
       marks: [
-        { side: "front", x: 43.8, y: 32.4, w: 13.2, logo: "prada.png", brand: "Prada" },
-        { side: "front", x: 49, y: 38.3, w: 11, logo: "max.png", brand: "Max" },
-        { side: "front", x: 43.8, y: 42.8, w: 10, logo: "spotify.png", brand: "Spotify" },
-        { side: "front", x: 53.1, y: 53.3, w: 6.5, logo: "chanel.png", brand: "Chanel" },
-        { side: "front", x: 42.8, y: 59.7, w: 5, logo: "pepsi.png", brand: "Pepsi" },
-        { side: "front", x: 43.8, y: 53.3, w: 5.5, logo: "mcdonalds.png", brand: "McDonald's" },
+        { side: "front", x: 42.6, y: 32.4, w: 13, h: 1.8, logo: "prada.png", brand: "Prada" },
+        { side: "front", x: 46.1, y: 38.3, w: 11, h: 3.1, logo: "max.png", brand: "Max" },
+        { side: "front", x: 42.1, y: 56.5, w: 6, h: 5.4, logo: "spotify.png", brand: "Spotify" },
+        { side: "front", x: 52.7, y: 54.7, w: 6, h: 3.6, logo: "chanel.png", brand: "Chanel" },
+        { side: "front", x: 54.2, y: 60.6, w: 5, h: 4.5, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "front", x: 42.1, y: 63.3, w: 5, h: 3.9, logo: "mcdonalds.png", brand: "McDonald's" },
 
-        { side: "back", x: 40.7, y: 21.9, w: 12, logo: "redbull.png", brand: "Red Bull" },
-        { side: "back", x: 45.3, y: 29.6, w: 11, logo: "sano.png", brand: "Sano" },
-        { side: "back", x: 40.7, y: 41, w: 10, logo: "zara.png", brand: "Zara" },
-        { side: "back", x: 47.3, y: 46, w: 9, logo: "spotify.png", brand: "Spotify" },
-        { side: "back", x: 39.7, y: 59.7, w: 6, logo: "chanel.png", brand: "Chanel" },
-        { side: "back", x: 52.4, y: 64.3, w: 5, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "back", x: 41.1, y: 22.3, w: 12, h: 6.5, logo: "redbull.png", brand: "Red Bull" },
+        { side: "back", x: 45.1, y: 30.1, w: 11, h: 10, logo: "sano.png", brand: "Sano" },
+        { side: "back", x: 40, y: 53.8, w: 10, h: 3.8, logo: "zara.png", brand: "Zara" },
+        { side: "back", x: 51.7, y: 51.5, w: 6, h: 5.4, logo: "spotify.png", brand: "Spotify" },
+        { side: "back", x: 40, y: 58.8, w: 6, h: 3.6, logo: "chanel.png", brand: "Chanel" },
+        { side: "back", x: 52.2, y: 60.6, w: 5.5, h: 4.9, logo: "pepsi.png", brand: "Pepsi" },
       ],
     },
   ],
   female: [
     {
       person: "p1", name: "Maya & Tal", where: "Tel Aviv", garment: "gown",
+      rate: 3060, frontX: 1.6,
       /* The V neckline bottoms out at y31 and the sleeves are sheer, so nothing
          starts above the beaded panel; her hands are clasped across the centre
          of the skirt; and on the back everything above y38 is illusion tulle
          over bare skin. This is the pair whose outline is measured by hand. */
       marks: [
-        { side: "front", x: 43.8, y: 38, w: 12.5, logo: "prada.png", brand: "Prada" },
-        { side: "front", x: 34.4, y: 75.2, w: 13.5, logo: "chanel.png", brand: "Chanel" },
-        { side: "front", x: 44.8, y: 58.8, w: 12.5, logo: "pepsi.png", brand: "Pepsi" },
-        { side: "front", x: 50.8, y: 78.8, w: 12, logo: "zara.png", brand: "Zara" },
-        { side: "front", x: 36.4, y: 67, w: 7, logo: "spotify.png", brand: "Spotify" },
-        { side: "front", x: 49.3, y: 71.5, w: 10, logo: "redbull.png", brand: "Red Bull" },
+        { side: "front", x: 43.8, y: 38, w: 12.5, h: 1.8, logo: "prada.png", brand: "Prada" },
+        { side: "front", x: 34.4, y: 75.2, w: 13.5, h: 8.3, logo: "chanel.png", brand: "Chanel" },
+        { side: "front", x: 44.8, y: 58.8, w: 12.5, h: 11.5, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "front", x: 50.8, y: 78.8, w: 12, h: 4.6, logo: "zara.png", brand: "Zara" },
+        { side: "front", x: 36.4, y: 67, w: 7, h: 6.4, logo: "spotify.png", brand: "Spotify" },
+        { side: "front", x: 49.3, y: 71.5, w: 10, h: 5.5, logo: "redbull.png", brand: "Red Bull" },
 
-        { side: "back", x: 42.5, y: 53.8, w: 13.5, logo: "prada.png", brand: "Prada" },
-        { side: "back", x: 45.5, y: 47.4, w: 8.5, logo: "redbull.png", brand: "Red Bull" },
-        { side: "back", x: 40.6, y: 58.8, w: 12, logo: "castro.png", brand: "Castro" },
-        { side: "back", x: 52.4, y: 71.1, w: 11, logo: "sano.png", brand: "Sano" },
-        { side: "back", x: 34.6, y: 71.1, w: 10, logo: "max.png", brand: "Max" },
-        { side: "back", x: 41.6, y: 75.7, w: 9.5, logo: "strauss.png", brand: "Strauss" },
+        { side: "back", x: 42.5, y: 53.8, w: 13.5, h: 2, logo: "prada.png", brand: "Prada" },
+        { side: "back", x: 45.5, y: 47.4, w: 8.5, h: 4.8, logo: "redbull.png", brand: "Red Bull" },
+        { side: "back", x: 40.6, y: 58.8, w: 12, h: 3.3, logo: "castro.png", brand: "Castro" },
+        { side: "back", x: 52.4, y: 71.1, w: 11, h: 10.3, logo: "sano.png", brand: "Sano" },
+        { side: "back", x: 34.6, y: 71.1, w: 10, h: 2.9, logo: "max.png", brand: "Max" },
+        { side: "back", x: 41.6, y: 75.7, w: 9.5, h: 6, logo: "strauss.png", brand: "Strauss" },
       ],
     },
     {
       person: "p2", name: "Dana Halevi", where: "Caesarea", garment: "gown",
+      rate: 2745, frontX: 1.45,
       /* The whole back above the y36 waist seam is illusion lace over skin, so
          that side is skirt only. */
       marks: [
-        { side: "front", x: 45.3, y: 30.1, w: 9.5, logo: "zara.png", brand: "Zara" },
-        { side: "front", x: 37.6, y: 63.3, w: 13.5, logo: "prada.png", brand: "Prada" },
-        { side: "front", x: 45.1, y: 35.1, w: 9.5, logo: "spotify.png", brand: "Spotify" },
-        { side: "front", x: 45.1, y: 46.9, w: 9.5, logo: "redbull.png", brand: "Red Bull" },
-        { side: "front", x: 44.6, y: 59.7, w: 8.5, logo: "castro.png", brand: "Castro" },
-        { side: "front", x: 34.1, y: 73.8, w: 9.5, logo: "sano.png", brand: "Sano" },
+        { side: "front", x: 45.3, y: 30.1, w: 9.5, h: 3.6, logo: "zara.png", brand: "Zara" },
+        { side: "front", x: 37.6, y: 63.3, w: 13.5, h: 2, logo: "prada.png", brand: "Prada" },
+        { side: "front", x: 45.1, y: 35.1, w: 9.5, h: 8.7, logo: "spotify.png", brand: "Spotify" },
+        { side: "front", x: 45.1, y: 46.9, w: 9.5, h: 5.3, logo: "redbull.png", brand: "Red Bull" },
+        { side: "front", x: 44.6, y: 59.7, w: 8.5, h: 2.3, logo: "castro.png", brand: "Castro" },
+        { side: "front", x: 34.1, y: 73.8, w: 9.5, h: 8.8, logo: "sano.png", brand: "Sano" },
 
-        { side: "back", x: 44.6, y: 40.6, w: 10.5, logo: "castro.png", brand: "Castro" },
-        { side: "back", x: 44.6, y: 45.1, w: 10.5, logo: "sano.png", brand: "Sano" },
-        { side: "back", x: 44.6, y: 56.5, w: 10.5, logo: "max.png", brand: "Max" },
-        { side: "back", x: 52.1, y: 62.9, w: 11, logo: "strauss.png", brand: "Strauss" },
-        { side: "back", x: 33.1, y: 69.7, w: 10, logo: "chanel.png", brand: "Chanel" },
-        { side: "back", x: 56.7, y: 72, w: 9.5, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "back", x: 44.6, y: 40.6, w: 10.5, h: 2.9, logo: "castro.png", brand: "Castro" },
+        { side: "back", x: 44.6, y: 45.1, w: 10.5, h: 9.7, logo: "sano.png", brand: "Sano" },
+        { side: "back", x: 44.6, y: 56.5, w: 10.5, h: 3, logo: "max.png", brand: "Max" },
+        { side: "back", x: 52.1, y: 62.9, w: 11, h: 6.9, logo: "strauss.png", brand: "Strauss" },
+        { side: "back", x: 33.1, y: 69.7, w: 10, h: 6.1, logo: "chanel.png", brand: "Chanel" },
+        { side: "back", x: 56.7, y: 72, w: 9.5, h: 8.7, logo: "pepsi.png", brand: "Pepsi" },
       ],
     },
     {
       person: "p3", name: "Noa Lev", where: "Haifa", garment: "gown",
+      rate: 2960, frontX: 1.5,
       /* Plain matte satin between y24 and y36 on the front - the best surface in
          the set. The back scoops to bare skin down to y29. */
       marks: [
-        { side: "front", x: 45.7, y: 27.6, w: 9.5, logo: "chanel.png", brand: "Chanel" },
-        { side: "front", x: 45.6, y: 35.1, w: 9.5, logo: "redbull.png", brand: "Red Bull" },
-        { side: "front", x: 43.1, y: 41.9, w: 11, logo: "castro.png", brand: "Castro" },
-        { side: "front", x: 38.6, y: 52.4, w: 12, logo: "sano.png", brand: "Sano" },
-        { side: "front", x: 52.1, y: 63.3, w: 11, logo: "max.png", brand: "Max" },
-        { side: "front", x: 29.6, y: 82, w: 10, logo: "strauss.png", brand: "Strauss" },
+        { side: "front", x: 45.7, y: 27.6, w: 9.5, h: 5.8, logo: "chanel.png", brand: "Chanel" },
+        { side: "front", x: 45.6, y: 35.1, w: 9.5, h: 5.3, logo: "redbull.png", brand: "Red Bull" },
+        { side: "front", x: 43.1, y: 41.9, w: 11, h: 3, logo: "castro.png", brand: "Castro" },
+        { side: "front", x: 38.6, y: 52.4, w: 12, h: 11.1, logo: "sano.png", brand: "Sano" },
+        { side: "front", x: 52.1, y: 63.3, w: 11, h: 3.1, logo: "max.png", brand: "Max" },
+        { side: "front", x: 29.6, y: 82, w: 10, h: 6.3, logo: "strauss.png", brand: "Strauss" },
 
-        { side: "back", x: 37.6, y: 53.8, w: 13.5, logo: "prada.png", brand: "Prada" },
-        { side: "back", x: 54.2, y: 72, w: 12.5, logo: "pepsi.png", brand: "Pepsi" },
-        { side: "back", x: 52.7, y: 53.8, w: 8.5, logo: "zara.png", brand: "Zara" },
-        { side: "back", x: 51.6, y: 58.8, w: 11, logo: "spotify.png", brand: "Spotify" },
-        { side: "back", x: 32.1, y: 69.7, w: 10, logo: "redbull.png", brand: "Red Bull" },
-        { side: "back", x: 43.1, y: 76.6, w: 9.5, logo: "castro.png", brand: "Castro" },
+        { side: "back", x: 37.6, y: 53.8, w: 13.5, h: 2, logo: "prada.png", brand: "Prada" },
+        { side: "back", x: 54.2, y: 72, w: 12.5, h: 11.4, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "back", x: 52.7, y: 53.8, w: 8.5, h: 3.3, logo: "zara.png", brand: "Zara" },
+        { side: "back", x: 51.6, y: 58.8, w: 11, h: 10, logo: "spotify.png", brand: "Spotify" },
+        { side: "back", x: 32.1, y: 69.7, w: 10, h: 5.5, logo: "redbull.png", brand: "Red Bull" },
+        { side: "back", x: 43.1, y: 76.6, w: 9.5, h: 2.6, logo: "castro.png", brand: "Castro" },
       ],
     },
   ],
@@ -1355,11 +1360,21 @@ const SHOWCASE = {
    Aviv, not rows in the database - the footer says as much.
    ========================================================================= */
 const SHOW_TARGET = 15000;
-const SHOW_PER_BRAND = 1450;
 
 const showBrands = entry => new Set(entry.marks.map(m => m.brand)).size;
-const showRaised = entry =>
-  Math.round((SHOW_TARGET + SHOW_PER_BRAND * showBrands(entry)) / 50) * 50;
+
+/* Priced the way the product says it prices: by area. Each mark covers
+   w × h of the frame, the wearer sets a rate for a point of cover and how
+   much more the front is worth, and the total is what the garment took.
+
+   Not a flat figure per sponsor. That gave three of the five the identical
+   number, because three of them carry the same ten brands, and five listings
+   with matching round totals read as a spreadsheet rather than as five
+   different days. These come out of the photographs - the widest gown carries
+   nearly twice the cover of the waistcoat - so they differ, and they land
+   wherever the arithmetic lands. */
+const showRaised = entry => Math.round(entry.rate * entry.marks.reduce(
+  (sum, m) => sum + (m.w * m.h / 100) * (m.side === "front" ? entry.frontX : 1), 0));
 
 /* The fullest bar in the set, so the five are drawn to one scale and can be
    compared to each other at a glance. */

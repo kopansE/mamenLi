@@ -143,12 +143,20 @@ const LAYOUT = {
 const GAP = 1.4;             /* percent of frame width kept clear between marks */
 const MIN_HEIGHT = 1.7;      /* percent of frame height, under which a mark is a smudge */
 
+/* rate   - shekels for one point of cover, which is the wearer's own asking
+            price in the product's own terms
+   frontX - how much more the front is worth than the back
+
+   No two of these are the same and none of them is round. Five listings
+   quoting identical tidy totals read as a spreadsheet; five people each asking
+   their own price read as five people. The totals fall out of these and the
+   area actually covered, so they are not chosen either. */
 const WEARER = {
-  p4: { name: "Roi Avital", where: "Jerusalem", garment: "suit" },
-  p5: { name: "Amit Barak", where: "Ramat Gan", garment: "suit" },
-  p1: { name: "Maya & Tal", where: "Tel Aviv", garment: "gown" },
-  p2: { name: "Dana Halevi", where: "Caesarea", garment: "gown" },
-  p3: { name: "Noa Lev", where: "Haifa", garment: "gown" },
+  p4: { name: "Roi Avital", where: "Jerusalem", garment: "suit", rate: 2870, frontX: 1.55 },
+  p5: { name: "Amit Barak", where: "Ramat Gan", garment: "suit", rate: 3180, frontX: 1.7 },
+  p1: { name: "Maya & Tal", where: "Tel Aviv", garment: "gown", rate: 3060, frontX: 1.6 },
+  p2: { name: "Dana Halevi", where: "Caesarea", garment: "gown", rate: 2745, frontX: 1.45 },
+  p3: { name: "Noa Lev", where: "Haifa", garment: "gown", rate: 2960, frontX: 1.5 },
 };
 
 const PACK = String.raw`
@@ -397,12 +405,17 @@ window.markPreview = function (who, marks) {
     await server.stop();
   }
 
+  /* `h` is carried even though the layout does not need it - the browser gets
+     the height from the artwork's own proportions - because the PRICE does.
+     A spot is sold by area, so the showcase needs to know how much of the
+     garment each mark actually covers. */
   const row = k =>
-    `        { side: "${k.side}", x: ${k.x}, y: ${k.y}, w: ${k.w}, logo: "${k.logo}", brand: "${k.brand}" },`;
+    `        { side: "${k.side}", x: ${k.x}, y: ${k.y}, w: ${k.w}, h: ${k.h}, logo: "${k.logo}", brand: "${k.brand}" },`;
   const lines = [];
   for (const p of ["p4", "p5", "p1", "p2", "p3"]) {
     const w = WEARER[p];
     lines.push(`    { person: "${p}", name: "${w.name}", where: "${w.where}", garment: "${w.garment}",`);
+    lines.push(`      rate: ${w.rate}, frontX: ${w.frontX},`);
     lines.push("      marks: [");
     for (const side of ["front", "back"]) {
       for (const k of packed[`${p}-${side}`]) lines.push(row(Object.assign({ side }, k)));

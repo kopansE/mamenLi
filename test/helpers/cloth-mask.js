@@ -324,10 +324,19 @@ const PHOTOS = {
     cutouts: [[26, 20, 45, 58], [66, 20, 80, 58]] },
   "p4-back":  { mode: "flood", tol: 8, seedX: 48, seedY: 35, yTop: 20, yBot: 90, warmth: 22, margin: 1.3,
     cutouts: [[24, 18, 39, 58], [58, 18, 74, 58]] },
-  "p5-front": { mode: "flood", tol: 8, seedX: 50, seedY: 45, yTop: 31, yBot: 88, warmth: 22, margin: 1.3,
-    cutouts: [[24, 20, 42, 58], [62, 20, 78, 58]] },
-  "p5-back":  { mode: "flood", tol: 8, seedX: 48, seedY: 35, yTop: 20, yBot: 90, warmth: 22, margin: 1.3,
-    cutouts: [[24, 18, 39, 58], [58, 18, 74, 58]] },
+  /* p5 is not wearing a jacket - waistcoat, shirt and trousers - so the shapes
+     here are nothing like p4's. What is struck out is the SHIRT sleeves: they
+     are a different garment from the one being sold, they are pale where the
+     waistcoat is mid-grey, and they hang clear of the body with backdrop
+     showing between forearm and hip. The upside is that a waistcoat back is
+     one flat unbroken panel, which is the best surface either man has.
+
+     The third rectangle on each is the waistcoat hem. A waistcoat ends and the
+     trousers begin, and a mark laid across that line spans two garments. */
+  "p5-front": { mode: "flood", tol: 8, seedX: 50, seedY: 42, yTop: 31, yBot: 90, warmth: 22, margin: 1.3,
+    cutouts: [[20, 17, 41, 50], [59, 17, 80, 50], [39, 45, 61, 53]] },
+  "p5-back":  { mode: "flood", tol: 8, seedX: 48, seedY: 30, yTop: 20, yBot: 92, warmth: 22, margin: 1.3,
+    cutouts: [[20, 17, 39, 50], [58, 17, 80, 50], [35, 44, 61, 50]] },
 };
 
 module.exports = { MASK_SOURCE, PHOTOS };
