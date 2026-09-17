@@ -1148,11 +1148,15 @@ const SPINNER = `<div class="empty-state" style="grid-column:1/-1"><span class="
 
 /* ------------------------------------------------------------- front door */
 async function renderHome() {
-  /* The showcase is drawn first and from constants, never from the network,
-     so the front door has a picture on it the instant the page exists. What
-     is actually listed can take its time filling in underneath. */
-  buildShowcase();
-  setShowPaused(false);
+  /* The showcase is NOT built here. It used to be, and that put the one thing
+     on the page that has to be instant behind `await Store.init()` - so on a
+     sleeping free-tier dyno, where /api/config takes the better part of a
+     minute to answer, the front door rendered a headline, two doors, and a
+     blank strip where the photographs belong. It is built at the bottom of
+     this file instead, off constants, the moment the script runs. All that is
+     left to do on the way back to the front door is start the clock again,
+     which keeps a deliberate pause deliberate. */
+  restartShowcase();
 
   const grid = $("#home-featured");
   grid.innerHTML = SPINNER;
@@ -1176,76 +1180,221 @@ async function renderHome() {
    else's logo printed on them. So: the front and the back of one person, side
    by side, sliding left to right through the men or the women.
 
-   Every patch below was placed against the actual photograph, on opaque
-   fabric, clear of hands, of bare arms, and of the sheer lace several of these
-   gowns carry across the shoulders - see public/assets/garments/manifest.json,
-   which records where the fabric really is in each frame. A logo on somebody's
-   skin is the one thing this picture must never show.
+   NOTHING IN THIS TABLE WAS POSITIONED BY EYE, and it must not be edited by
+   eye either. A mark that laps over the edge of a suit is the one mistake that
+   makes the whole page look fake - somebody has to actually print this on a
+   garment and wear it to a wedding - and a rectangle that looks safely inside
+   a shoulder at 500 pixels wide is over the seam at full size.
+
+   So every rectangle here was packed against a mask of the photograph built
+   from its own pixels: the background flooded away, bare skin dropped, the
+   head and the shoes and the train on the floor cut off, and then the whole
+   thing eroded by a margin. A position was only accepted when EVERY pixel of
+   the rectangle fell inside what was left. The one exception is p1, shot
+   outdoors against a villa, where no threshold separates ivory lace from
+   sunlit stone and the gown's outline was measured by hand instead.
+
+   Two more rules decide which mark goes where. Each one is cut out with no
+   background, so it prints straight onto the cloth and has to carry its own
+   contrast: the white-ink marks - Lever Up, RIV, ZVZZT - are invisible on an
+   ivory gown, and Cryptopolitan's navy wordmark is invisible on a navy suit,
+   so the ivory and the navy lists are different and only mid-grey p5 carries
+   all twelve. And the marks are dealt into horizontal bands two at a time,
+   one leaning left and one right, because a packer left to itself puts
+   everything on the chest - it is the widest open cloth - and leaves the
+   trousers and the hem bare.
 
    Only `w` is given. The height comes from the logo's own proportions, because
-   the supplied artwork runs from a 2.3:1 wordmark to a perfect square and any
-   fixed box would crop or stretch one of them.
+   the artwork runs from a 4.2:1 wordmark to a tall poster and any fixed box
+   would crop or stretch one of them. That also means the artwork's transparent
+   margin has to be trimmed off before it ships, or `w` describes the padding
+   rather than the mark - see scripts/trim-logos.js.
    ========================================================================= */
+
+/* The pixel size of each photograph, so its <img> can reserve the right box
+   before a byte of it has arrived. Without this the showcase is nothing but a
+   thin strip until the first photograph decodes, and the front door jumps
+   under the reader. These are the same numbers as garments/manifest.json;
+   they are repeated rather than fetched because fetching them would put the
+   showcase back behind a network round trip, which is the one thing this
+   section exists to avoid. */
+const PHOTO = {
+  "p1-front": [1405, 1536], "p1-back": [1415, 1536],
+  "p2-front": [1396, 1536], "p2-back": [1396, 1536],
+  "p3-front": [1396, 1536], "p3-back": [1396, 1536],
+  "p4-front": [1266, 1536], "p4-back": [1381, 1536],
+  "p5-front": [1357, 1536], "p5-back": [1376, 1536],
+};
+
 const SHOWCASE = {
   male: [
     {
       person: "p4", name: "Roi Avital", where: "Jerusalem", garment: "suit",
-      /* the jacket hangs open, so the front patch sits on the left panel
-         rather than the centre, which is tie and then waistcoat */
+      /* Near-black navy, so every mark on it has light ink. The jacket hangs
+         open, which rules out the centre line - tie down to y30, then
+         waistcoat - and the trousers separate below y59. */
       marks: [
-        { side: "front", x: 38, y: 28, w: 16, logo: "04_tiptop.png", brand: "TipTop" },
-        { side: "back", x: 39, y: 29, w: 24, logo: "02_lever_up.png", brand: "Lever Up" },
+        { side: "front", x: 46.9, y: 32.4, w: 12, logo: "mcdonalds.png", brand: "McDonald's" },
+        { side: "front", x: 55, y: 42.6, w: 9.5, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "front", x: 46.9, y: 44.1, w: 6.5, logo: "spotify.png", brand: "Spotify" },
+        { side: "front", x: 55, y: 52.3, w: 9, logo: "osem.png", brand: "Osem" },
+        { side: "front", x: 46, y: 59.4, w: 6, logo: "sano.png", brand: "Sano" },
+        { side: "front", x: 46, y: 67.6, w: 5, logo: "strauss.png", brand: "Strauss" },
+
+        { side: "back", x: 41.1, y: 21.4, w: 12, logo: "sano.png", brand: "Sano" },
+        { side: "back", x: 45.1, y: 33.7, w: 11, logo: "strauss.png", brand: "Strauss" },
+        { side: "back", x: 41.1, y: 41.9, w: 10, logo: "redbull.png", brand: "Red Bull" },
+        { side: "back", x: 47.1, y: 48.8, w: 9, logo: "mcdonalds.png", brand: "McDonald's" },
+        { side: "back", x: 39.5, y: 59.7, w: 5.5, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "back", x: 52.2, y: 62.4, w: 5, logo: "spotify.png", brand: "Spotify" },
       ],
     },
     {
       person: "p5", name: "Amit Barak", where: "Ramat Gan", garment: "suit",
+      /* Mid-grey, the only cloth in the set that takes a light mark and a dark
+         one equally well, so this is the garment that carries all twelve. */
       marks: [
-        { side: "front", x: 36, y: 28, w: 16, logo: "06_cryptopolitan.png", brand: "Cryptopolitan" },
-        { side: "back", x: 41, y: 27, w: 18, logo: "12_riv.png", brand: "RIV" },
+        { side: "front", x: 43.8, y: 32.4, w: 13.2, logo: "prada.png", brand: "Prada" },
+        { side: "front", x: 49, y: 38.3, w: 11, logo: "max.png", brand: "Max" },
+        { side: "front", x: 43.8, y: 42.8, w: 10, logo: "spotify.png", brand: "Spotify" },
+        { side: "front", x: 53.1, y: 53.3, w: 6.5, logo: "chanel.png", brand: "Chanel" },
+        { side: "front", x: 42.8, y: 59.7, w: 5, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "front", x: 43.8, y: 53.3, w: 5.5, logo: "mcdonalds.png", brand: "McDonald's" },
+
+        { side: "back", x: 40.7, y: 21.9, w: 12, logo: "redbull.png", brand: "Red Bull" },
+        { side: "back", x: 45.3, y: 29.6, w: 11, logo: "sano.png", brand: "Sano" },
+        { side: "back", x: 40.7, y: 41, w: 10, logo: "zara.png", brand: "Zara" },
+        { side: "back", x: 47.3, y: 46, w: 9, logo: "spotify.png", brand: "Spotify" },
+        { side: "back", x: 39.7, y: 59.7, w: 6, logo: "chanel.png", brand: "Chanel" },
+        { side: "back", x: 52.4, y: 64.3, w: 5, logo: "pepsi.png", brand: "Pepsi" },
       ],
     },
   ],
   female: [
     {
       person: "p1", name: "Maya & Tal", where: "Tel Aviv", garment: "gown",
-      /* the V neckline bottoms out at y31 and the sleeves are sheer, so the
-         chest patch starts below the V and stays inside the beaded panel */
+      /* The V neckline bottoms out at y31 and the sleeves are sheer, so nothing
+         starts above the beaded panel; her hands are clasped across the centre
+         of the skirt; and on the back everything above y38 is illusion tulle
+         over bare skin. This is the pair whose outline is measured by hand. */
       marks: [
-        { side: "front", x: 44, y: 33, w: 14, logo: "01_wave_logo.png", brand: "Wave" },
-        { side: "back", x: 41, y: 46, w: 18, logo: "10_blue_star.png", brand: "Blue Star" },
+        { side: "front", x: 43.8, y: 38, w: 12.5, logo: "prada.png", brand: "Prada" },
+        { side: "front", x: 34.4, y: 75.2, w: 13.5, logo: "chanel.png", brand: "Chanel" },
+        { side: "front", x: 44.8, y: 58.8, w: 12.5, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "front", x: 50.8, y: 78.8, w: 12, logo: "zara.png", brand: "Zara" },
+        { side: "front", x: 36.4, y: 67, w: 7, logo: "spotify.png", brand: "Spotify" },
+        { side: "front", x: 49.3, y: 71.5, w: 10, logo: "redbull.png", brand: "Red Bull" },
+
+        { side: "back", x: 42.5, y: 53.8, w: 13.5, logo: "prada.png", brand: "Prada" },
+        { side: "back", x: 45.5, y: 47.4, w: 8.5, logo: "redbull.png", brand: "Red Bull" },
+        { side: "back", x: 40.6, y: 58.8, w: 12, logo: "castro.png", brand: "Castro" },
+        { side: "back", x: 52.4, y: 71.1, w: 11, logo: "sano.png", brand: "Sano" },
+        { side: "back", x: 34.6, y: 71.1, w: 10, logo: "max.png", brand: "Max" },
+        { side: "back", x: 41.6, y: 75.7, w: 9.5, logo: "strauss.png", brand: "Strauss" },
       ],
     },
     {
       person: "p2", name: "Dana Halevi", where: "Caesarea", garment: "gown",
-      /* the whole back above the waist seam is illusion lace over skin */
+      /* The whole back above the y36 waist seam is illusion lace over skin, so
+         that side is skirt only. */
       marks: [
-        { side: "front", x: 44, y: 42, w: 14, logo: "09_purple_frog.png", brand: "Purple Frog" },
-        { side: "back", x: 40, y: 45, w: 18, logo: "07_zvzzt.png", brand: "ZVZZT" },
+        { side: "front", x: 45.3, y: 30.1, w: 9.5, logo: "zara.png", brand: "Zara" },
+        { side: "front", x: 37.6, y: 63.3, w: 13.5, logo: "prada.png", brand: "Prada" },
+        { side: "front", x: 45.1, y: 35.1, w: 9.5, logo: "spotify.png", brand: "Spotify" },
+        { side: "front", x: 45.1, y: 46.9, w: 9.5, logo: "redbull.png", brand: "Red Bull" },
+        { side: "front", x: 44.6, y: 59.7, w: 8.5, logo: "castro.png", brand: "Castro" },
+        { side: "front", x: 34.1, y: 73.8, w: 9.5, logo: "sano.png", brand: "Sano" },
+
+        { side: "back", x: 44.6, y: 40.6, w: 10.5, logo: "castro.png", brand: "Castro" },
+        { side: "back", x: 44.6, y: 45.1, w: 10.5, logo: "sano.png", brand: "Sano" },
+        { side: "back", x: 44.6, y: 56.5, w: 10.5, logo: "max.png", brand: "Max" },
+        { side: "back", x: 52.1, y: 62.9, w: 11, logo: "strauss.png", brand: "Strauss" },
+        { side: "back", x: 33.1, y: 69.7, w: 10, logo: "chanel.png", brand: "Chanel" },
+        { side: "back", x: 56.7, y: 72, w: 9.5, logo: "pepsi.png", brand: "Pepsi" },
       ],
     },
     {
       person: "p3", name: "Noa Lev", where: "Haifa", garment: "gown",
-      /* plain matte satin between y24 and y36 - the best surface in the set */
+      /* Plain matte satin between y24 and y36 on the front - the best surface in
+         the set. The back scoops to bare skin down to y29. */
       marks: [
-        { side: "front", x: 45, y: 27, w: 13, logo: "13_zara.svg", brand: "Zara" },
-        { side: "back", x: 39, y: 46, w: 18, logo: "14_redbull.svg", brand: "Red Bull" },
+        { side: "front", x: 45.7, y: 27.6, w: 9.5, logo: "chanel.png", brand: "Chanel" },
+        { side: "front", x: 45.6, y: 35.1, w: 9.5, logo: "redbull.png", brand: "Red Bull" },
+        { side: "front", x: 43.1, y: 41.9, w: 11, logo: "castro.png", brand: "Castro" },
+        { side: "front", x: 38.6, y: 52.4, w: 12, logo: "sano.png", brand: "Sano" },
+        { side: "front", x: 52.1, y: 63.3, w: 11, logo: "max.png", brand: "Max" },
+        { side: "front", x: 29.6, y: 82, w: 10, logo: "strauss.png", brand: "Strauss" },
+
+        { side: "back", x: 37.6, y: 53.8, w: 13.5, logo: "prada.png", brand: "Prada" },
+        { side: "back", x: 54.2, y: 72, w: 12.5, logo: "pepsi.png", brand: "Pepsi" },
+        { side: "back", x: 52.7, y: 53.8, w: 8.5, logo: "zara.png", brand: "Zara" },
+        { side: "back", x: 51.6, y: 58.8, w: 11, logo: "spotify.png", brand: "Spotify" },
+        { side: "back", x: 32.1, y: 69.7, w: 10, logo: "redbull.png", brand: "Red Bull" },
+        { side: "back", x: 43.1, y: 76.6, w: 9.5, logo: "castro.png", brand: "Castro" },
       ],
     },
   ],
 };
 
+/* =========================================================================
+   what each example earned
+
+   A wearer sets a target and sponsors bid against it. Every garment in the
+   showcase clears its target - these are the examples, they are meant to be
+   the argument - so what the bar has to show is not whether it was met but by
+   how much, and that is why the track runs to the best of the five rather
+   than to the target itself.
+
+   The figure follows the number of DISTINCT sponsors on the garment, because
+   that is the thing a reader can count for themselves on the photograph in
+   front of them. Two of the gowns carry the same ten brands and therefore
+   raise the same amount; that is not a bug, it is what the picture says.
+
+   Shekels, and formatted as shekels regardless of what currency the live
+   marketplace is configured for. These five are illustrations of a day in Tel
+   Aviv, not rows in the database - the footer says as much.
+   ========================================================================= */
+const SHOW_TARGET = 15000;
+const SHOW_PER_BRAND = 1450;
+
+const showBrands = entry => new Set(entry.marks.map(m => m.brand)).size;
+const showRaised = entry =>
+  Math.round((SHOW_TARGET + SHOW_PER_BRAND * showBrands(entry)) / 50) * 50;
+
+/* The fullest bar in the set, so the five are drawn to one scale and can be
+   compared to each other at a glance. */
+const SHOW_CEILING = Math.max(
+  ...[].concat(SHOWCASE.male, SHOWCASE.female).map(showRaised));
+
+const shekels = n => {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency", currency: "ILS",
+      minimumFractionDigits: 0, maximumFractionDigits: 0,
+    }).format(n);
+  } catch { return "₪" + new Intl.NumberFormat().format(n); }
+};
+
 const SHOW_MS = 3000;
 const show = { tab: "male", i: 0, timer: null, paused: false, hovering: false };
 
-function showPanel(entry, side) {
+/* `eager` is the slide that is actually on screen. Everything else in the
+   track is a slide away and can wait, but the first pair is the picture the
+   page is judged on, so it is fetched at once and at high priority rather
+   than being left to the lazy queue. */
+function showPanel(entry, side, eager) {
   const marks = entry.marks.filter(m => m.side === side).map(m => `
     <span class="mark" style="top:${m.y}%;left:${m.x}%;width:${m.w}%">
-      <img src="/assets/logos/${esc(m.logo)}" alt="${esc(m.brand)}" loading="lazy" decoding="async">
+      <img src="/assets/logos/${esc(m.logo)}" alt="${esc(m.brand)}"
+           loading="${eager ? "eager" : "lazy"}" decoding="async">
     </span>`).join("");
+  const [pw, ph] = PHOTO[`${entry.person}-${side}`] || [];
   return `<figure class="shot">
     <img class="garment-photo" src="/assets/garments/${entry.person}-${side}.jpg"
          alt="${esc(entry.name)}, ${side}, with sponsors printed on the ${esc(entry.garment)}"
-         loading="lazy" decoding="async">
+         ${pw ? `width="${pw}" height="${ph}"` : ""}
+         loading="${eager ? "eager" : "lazy"}"
+         ${eager ? `fetchpriority="high"` : ""} decoding="async">
     <span class="side-tag">${side}</span>${marks}
   </figure>`;
 }
@@ -1255,8 +1404,9 @@ function showPanel(entry, side) {
    whole point is that the eye follows one picture out and the next one in. */
 function buildShowcase() {
   const list = SHOWCASE[show.tab];
-  $("#show-track").innerHTML = list.map(entry =>
-    `<div class="slide">${showPanel(entry, "front")}${showPanel(entry, "back")}</div>`).join("");
+  $("#show-track").innerHTML = list.map((entry, n) =>
+    `<div class="slide">${showPanel(entry, "front", n === 0)}${showPanel(entry, "back", n === 0)}</div>`
+  ).join("");
   $("#show-track").style.setProperty("--slides", list.length);
 
   $("#show-dots").innerHTML = list.map((e, n) =>
@@ -1274,8 +1424,26 @@ function paintShowcase() {
   const list = SHOWCASE[show.tab];
   const entry = list[show.i];
   $("#show-track").style.transform = `translateX(-${show.i * (100 / list.length)}%)`;
+  /* DISTINCT brands, not marks. A sponsor who buys the front and the back is
+     one sponsor with two spots, and counting the rows said "12 sponsors" over
+     a garment showing seven of them - which anybody who counts will catch. */
+  const brands = showBrands(entry);
   $("#show-caption").textContent =
-    `${entry.name} · ${entry.where} — two sponsors, drawn and priced by area`;
+    `${entry.name} · ${entry.where} — ${brands} sponsor${brands === 1 ? "" : "s"}, drawn and priced by area`;
+
+  const raised = showRaised(entry);
+  const over = Math.round((raised / SHOW_TARGET - 1) * 100);
+  $("#show-raised").textContent = shekels(raised);
+  $("#show-target").textContent = shekels(SHOW_TARGET);
+  $("#show-over").textContent = `${over}% over target`;
+  $("#show-tick").style.insetInlineStart = (SHOW_TARGET / SHOW_CEILING * 100).toFixed(1) + "%";
+  $("#show-meter").setAttribute("aria-label",
+    `${shekels(raised)} raised against a ${shekels(SHOW_TARGET)} target, ${over}% over`);
+  /* Next frame, so the width lands as a transition rather than a jump when the
+     slide changes. */
+  requestAnimationFrame(() => {
+    $("#show-bar").style.width = (raised / SHOW_CEILING * 100).toFixed(1) + "%";
+  });
   $$("#show-dots [data-show]").forEach((b, n) =>
     b.setAttribute("aria-selected", String(n === show.i)));
 }
@@ -1340,6 +1508,12 @@ $("#showcase").addEventListener("keydown", e => {
   if (e.key === "ArrowLeft") { e.preventDefault(); prevShow(); }
 });
 
+/* Now, not when boot gets round to it. The front door ships visible in the
+   markup precisely so that a stalled boot cannot blank the page, and the
+   photographs are the half of it that matters most. */
+buildShowcase();
+setShowPaused(false);
+
 /* --------------------------------------------------------- browse screen */
 function matchesFilter(l, filter) {
   if (filter === "all") return true;
@@ -1403,6 +1577,22 @@ function setAuthMode(mode) {
   $("#au-name").closest(".fld").hidden = mode === "in";
   $("#au-brand-fld").hidden = mode === "in" || authRole !== "brand";
   $("#au-pw").autocomplete = mode === "up" ? "new-password" : "current-password";
+
+  /* The social button is NOT part of the sign-up form. An account created
+     with Google has no password to type into the form below it, so leaving
+     this off the sign-in side locks out everyone who arrived that way - and
+     they are the people most likely to come back to it.
+
+     Whether there is a provider at all is boot's business, and boot records
+     it on the block itself (`data-ready`). This function re-applies that fact
+     on every switch between the two forms, so the block cannot be left in
+     whichever state the other mode happened to want. In demo mode there is
+     nothing behind the button - `data-ready` is "0", and it stays off both
+     forms rather than offering a provider that is not there. */
+  const oauth = $("#oauth-block");
+  oauth.hidden = oauth.dataset.ready !== "1";
+  $("#go-google-label").textContent = mode === "up" ? "Sign up with Google" : "Sign in with Google";
+  $("#oauth-or").textContent = mode === "up" ? "or with an email" : "or with your email";
 }
 $("#auth-toggle").addEventListener("click", () => setAuthMode(authMode === "up" ? "in" : "up"));
 
@@ -2393,8 +2583,15 @@ async function bootReally() {
     ? `Live · ${Store.config.publishableKey ? "payments on" : "payments not configured"}`
     : "Demo mode · nothing here is stored on a server";
 
-  /* Social sign-in only exists when there is a project behind it. */
-  $("#oauth-block").hidden = mode !== "supabase";
+  /* Social sign-in only exists when there is a project behind it. That fact is
+     written onto the block rather than kept here, because setAuthMode() puts
+     the auth screen together for whichever form is showing and has to be able
+     to read it back - both forms offer the button, so neither may own it.
+     The `hidden` below covers the screen being open already, which it can be
+     if somebody reached it while /api/config was still in the air. */
+  const oauth = $("#oauth-block");
+  oauth.dataset.ready = mode === "supabase" ? "1" : "0";
+  oauth.hidden = mode !== "supabase";
 
   Store.auth.onChange(() => { renderAccount(); askRoleIfNeeded(); });
   renderAccount();

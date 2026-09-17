@@ -36,7 +36,7 @@ public/           everything served over HTTP. NOTHING outside it is reachable.
   assets/js/app.js      screens, rendering, the studio, sharing
 server/index.js   Stripe, CSRF, rate limits, webhooks, settlement
 supabase/migrations/    source of truth for the schema
-test/                   322 tests
+test/                   425 tests
 ```
 
 Hosting is **Render**; database, auth and file storage are **Supabase**;
@@ -66,11 +66,17 @@ page — that confusion has cost time before.
 - **Everything reaching `innerHTML` goes through `esc()`**, every URL through
   `safeUrl()`. There is an XSS regression test that plants a payload in every
   publisher- and brand-controlled field.
+- **The showcase marks are never positioned by eye.** A sponsor's patch has to
+  sit entirely on the garment — somebody prints these and wears them — and at
+  the size the front door renders, a rectangle hanging off a trouser leg looks
+  fine and is wrong. `scripts/place-marks.js` packs them against a mask of the
+  photograph's own pixels; a browser test re-checks every one. Change the
+  table with the script, not with a nudge.
 
 ## Working here
 
 ```powershell
-npm test          # 322 tests, ~45s. Run before every push.
+npm test          # 425 tests, ~2min. Run before every push.
 npm run verify    # proves the LIVE database still refuses what it should
 npm start         # http://localhost:8787
 ```

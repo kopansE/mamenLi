@@ -36,6 +36,7 @@ const assert = require("node:assert/strict");
 
 const { Browser, findChrome } = require("./helpers/cdp.js");
 const { startServer } = require("./helpers/server.js");
+const { MASK_SOURCE, PHOTOS } = require("./helpers/cloth-mask.js");
 const Market = require("../public/assets/js/market.js");
 
 const PORT = 8792;
@@ -516,6 +517,8 @@ describe("the page in a real browser", SUITE_OPTS, () => {
           complete: shots.map(i => i.complete && i.naturalWidth > 0),
           marks: [...slide.querySelectorAll(".mark img")].map(i => i.getAttribute("alt")),
           logos: [...slide.querySelectorAll(".mark img")].map(i => i.getAttribute("src")),
+          marksLoaded: [...slide.querySelectorAll(".mark img")].map(i =>
+            ({ src: i.getAttribute("src"), ok: i.complete && i.naturalWidth > 0 })),
           caption: document.getElementById("show-caption").textContent,
           dots: document.querySelectorAll("#show-dots [data-show]").length,
         };
@@ -537,12 +540,21 @@ describe("the page in a real browser", SUITE_OPTS, () => {
          front door with two empty rectangles on it. */
       assert.deepEqual(m.complete, [true, true], "a showcase photograph did not load");
 
-      assert.equal(m.marks.length, 2, "the point of the picture is the logo on the cloth");
+      /* A garment carrying one patch looks like a mock-up. A garment carrying
+         a dozen looks like the thing being sold, which is the whole argument
+         the front door is making. */
+      assert.ok(m.marks.length >= 8,
+        `the point of the picture is the sponsors on the cloth, and there are only ${m.marks.length}`);
       assert.ok(m.marks.every(t => t && t.trim().length),
         "a sponsor patch rendered with no alt text, so it is invisible to a screen reader");
       for (const src of m.logos) {
         assert.ok(src.startsWith("/assets/logos/"), `a patch is loading artwork from ${src}`);
       }
+
+      /* Artwork is renamed and re-cut by hand, and a src that no longer
+         resolves leaves an alt-text stub sitting on the gown. */
+      assert.deepEqual(m.marksLoaded.filter(s => !s.ok).map(s => s.src), [],
+        "a sponsor's artwork did not load");
       assert.match(m.caption, /·/, "the caption should name who this is and where");
       assert.ok(m.dots >= 2, "there is more than one man to show, so there should be dots");
 
@@ -592,7 +604,15 @@ describe("the page in a real browser", SUITE_OPTS, () => {
       const page = await browser.newPage({ width: 1280, height: 900 });
       openPages.push(page);
       await page.clearStorage(ORIGIN);
-      await page.send("Network.setBlockedURLs", { urls: ["*/api/config"] });
+
+      /* Fetch.enable and then never resume the request, rather than
+         Network.setBlockedURLs. A blocked request FAILS, immediately, and a
+         rejected fetch lets boot fall through to its catch and carry on - so
+         the blocked version of this test passed even while the showcase was
+         still being built inside `await Store.init()`. A sleeping dyno does
+         not fail. It hangs, for the better part of a minute, and the front
+         door has to be complete before the answer arrives. */
+      await page.send("Fetch.enable", { patterns: [{ urlPattern: "*/api/config*" }] });
       await page.send("Page.navigate", { url: ORIGIN + "/" });
       await new Promise(r => setTimeout(r, 4000));
 
@@ -602,15 +622,99 @@ describe("the page in a real browser", SUITE_OPTS, () => {
           homeVisible: !home.hidden,
           headline: (document.querySelector("#screen-home h1") || {}).textContent || "",
           doors: document.querySelectorAll(".door").length,
-          photos: document.querySelectorAll(".slide .garment-photo").length,
+          photos: [...document.querySelectorAll(".slide .garment-photo")]
+            .filter(i => i.complete && i.naturalWidth > 0).length,
+          marks: document.querySelectorAll(".slide .mark img").length,
+          /* Rewritten by bootReally the moment Store.init() resolves, and
+             left at the markup's bare "Demo mode" until then. */
+          footMode: document.getElementById("foot-mode").textContent.trim(),
         };
       `);
 
+      assert.equal(m.footMode, "Demo mode",
+        "the config request was supposed to hang - this test proves nothing if boot finished");
       assert.ok(m.homeVisible, "the front door was hidden, so the page rendered as blank");
       assert.match(m.headline, /\S/, "there was no headline on screen");
       assert.equal(m.doors, 2, "neither door was reachable");
       assert.ok(m.photos >= 2,
         "the showcase is drawn from constants, not the network, so it must survive this");
+      assert.ok(m.marks >= 8,
+        "the photographs arrived but the sponsors on them did not");
+    });
+
+    /* ------------------------------------------- every mark is ON the garment
+       The one mistake this component can make that makes the whole product
+       look fake. Somebody has to print these and wear them to a real wedding,
+       so a patch that laps over a shoulder onto the sky is not a cosmetic
+       nit - it says the site does not know where the fabric is.
+
+       It cannot be eyeballed. At the size the showcase renders, a rectangle
+       overhanging a trouser leg by three percent looks fine and is wrong, and
+       that is exactly how the first version of this table shipped. So the
+       photograph is read back off a canvas, turned into a mask of what is
+       cloth (see test/helpers/cloth-mask.js), and EVERY pixel of every mark's
+       rectangle has to land inside it. */
+    it("never prints a sponsor off the edge of the garment", async () => {
+      const page = await open({ screen: "home" });
+
+      const report = await page.evaluate(`
+        ${MASK_SOURCE}
+
+        /* Both tabs, so the women are checked as well as the men. */
+        const marks = [];
+        for (const tab of ["male", "female"]) {
+          document.getElementById("show-" + tab).click();
+          await new Promise(r => setTimeout(r, 120));
+          for (const fig of document.querySelectorAll(".showcase .shot")) {
+            const img = fig.querySelector(".garment-photo");
+            const who = img.getAttribute("src").split("/").pop().replace(".jpg", "");
+            const f = fig.getBoundingClientRect();
+            for (const el of fig.querySelectorAll(".mark")) {
+              const r = el.getBoundingClientRect();
+              marks.push({
+                who, brand: el.querySelector("img").alt,
+                x: (r.left - f.left) / f.width,
+                y: (r.top - f.top) / f.height,
+                w: r.width / f.width,
+                h: r.height / f.height,
+              });
+            }
+          }
+        }
+
+        const params = ${JSON.stringify(PHOTOS)};
+        const bad = [];
+        const seen = new Set();
+        for (const k of marks) {
+          if (!seen.has(k.who)) {
+            const info = await window.buildMask(k.who, params[k.who]);
+            if (info.error) return { fatal: k.who + ": " + info.error };
+            seen.add(k.who);
+          }
+          const m = window.__mask[k.who];
+          const x = Math.round(k.x * m.W), y = Math.round(k.y * m.H);
+          const w = Math.round(k.w * m.W), h = Math.round(k.h * m.H);
+          if (!window.allCloth(m, x, y, w, h)) {
+            bad.push(k.who + " / " + k.brand +
+              " at x" + (k.x * 100).toFixed(1) + " y" + (k.y * 100).toFixed(1) +
+              " w" + (k.w * 100).toFixed(1));
+          }
+        }
+        return { checked: marks.length, photos: seen.size, bad };
+      `);
+
+      assert.ok(!report.fatal, report.fatal);
+      /* A floor, not the real number - how many sponsors a garment carries is
+         a judgement call that has already been changed once. What this catches
+         is marks quietly disappearing instead of moving, which would make the
+         assertion below pass by having nothing left to check. */
+      assert.equal(report.photos, 10, "not every garment photograph was checked");
+      assert.ok(report.checked >= 50,
+        `only ${report.checked} sponsor marks are on the garments in total`);
+      assert.deepEqual(report.bad, [],
+        "these marks hang off the garment:\n  " + report.bad.join("\n  "));
+
+      assert.deepEqual(page.errors(), [], page.consoleText());
     });
   });
 
@@ -699,6 +803,68 @@ describe("the page in a real browser", SUITE_OPTS, () => {
       assert.deepEqual(m.screen, ["campaign"], "a publisher who taps a spot should stay where they are");
       assert.equal(m.sheetOpen, false, "a publisher was shown a bid sheet");
       assert.match(m.toasts, /wearer|sponsor/i);
+    });
+
+    /* Social sign-in belongs on BOTH forms.
+       Somebody whose account was created with Google has no password to put
+       into the email form, so a sign-in screen without the Google button is a
+       locked door for exactly the people most likely to be coming back.
+
+       Two things are load-bearing in how this is written.
+
+       * The suite runs in DEMO mode, where there is deliberately no provider
+         behind the button, so "is it showing?" cannot be asked directly. What
+         boot writes when a project IS configured is `data-ready="1"` on the
+         block; setting it here is how a demo-mode tab exercises the live-mode
+         branch without keys, a project, or a network. If that attribute ever
+         stops being the switch, this test stops compiling its own premise and
+         the first two assertions below - which are pure demo mode - still hold
+         the line that an unconfigured site must not offer the button.
+       * The mode is flipped with the page's own "Sign in / Create one" link
+         rather than by calling anything, because the bug was that switching
+         forms left the block behind: only a real switch can catch that. */
+    it("offers Google on both forms when a project is configured, and on neither when not", async () => {
+      const page = await open({ screen: "home" });
+      const m = await page.evaluate(`
+        const read = () => ({
+          hidden: document.getElementById("oauth-block").hidden,
+          label: document.getElementById("go-google-label").textContent.trim(),
+        });
+        const swap = async () => {
+          document.getElementById("auth-toggle").click();
+          await new Promise(r => setTimeout(r, 200));
+        };
+        const out = {};
+
+        /* Into the account screen the way the header sends you: sign-in mode. */
+        document.getElementById("nav-in").click();
+        await new Promise(r => setTimeout(r, 300));
+        out.screen = ${VISIBLE};
+        out.demoIn = read();
+        await swap();
+        out.demoUp = read();
+
+        /* Now say what a configured deployment says. */
+        document.getElementById("oauth-block").dataset.ready = "1";
+        await swap();                       // back to sign-in, re-applied
+        out.liveIn = read();
+        await swap();
+        out.liveUp = read();
+        return out;
+      `);
+
+      assert.deepEqual(m.screen, ["auth"], "the header's sign-in button did not open the account screen");
+      assert.equal(m.demoIn.hidden, true, "demo mode offered a provider that is not there");
+      assert.equal(m.demoUp.hidden, true, "...on the sign-up form either");
+
+      assert.equal(m.liveIn.hidden, false,
+        "the Google button is missing from the SIGN-IN form - which is the only way back in for an account made with it");
+      assert.equal(m.liveUp.hidden, false, "the Google button is missing from the sign-up form");
+
+      /* The same button, but it is not doing the same thing on the two forms,
+         and it should not claim to be. */
+      assert.match(m.liveIn.label, /sign in/i, "the sign-in form invites you to sign up with Google");
+      assert.match(m.liveUp.label, /sign up/i, "the sign-up form invites you to sign in with Google");
     });
   });
 

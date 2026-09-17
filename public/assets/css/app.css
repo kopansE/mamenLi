@@ -917,15 +917,16 @@ body.has-actionbar{padding-bottom:78px}
 .showcase .shot{position:relative;margin:0;overflow:hidden;border-radius:var(--r-lg);background:var(--wash-2)}
 .showcase .shot .garment-photo{display:block;width:100%;height:auto}
 
-/* A printed patch. The supplied artwork is opaque - each logo carries its own
-   background - so it sits on a white card the way a real printed label does,
-   which also keeps a dark logo legible on a navy suit. Only the width is set;
-   the height follows the artwork, which runs from a 2.3:1 wordmark to a
-   square, and any fixed box would crop or stretch one of them. */
+/* A printed patch. The artwork is cut out now, so there is no white card under
+   it any more - that card was the giveaway that these were stickers rather
+   than print, and the reference this is built from has none. The shadow is a
+   drop-shadow rather than a box-shadow for the same reason: it follows the
+   silhouette of the mark, so a star throws a star. Only the width is set; the
+   height follows the artwork, which runs from a 2.6:1 wordmark to a tall
+   poster, and any fixed box would crop or stretch one of them. */
 .showcase .mark{
-  position:absolute;display:block;padding:2.5%;
-  background:#fff;border-radius:4px;
-  box-shadow:0 2px 12px -3px rgba(20,18,14,.55);
+  position:absolute;display:block;
+  filter:drop-shadow(0 1px 2px rgba(20,18,14,.4));
 }
 .showcase .mark img{display:block;width:100%;height:auto}
 
@@ -955,6 +956,30 @@ body.has-actionbar{padding-bottom:78px}
 .showpause:hover{color:var(--ink);border-color:var(--ink)}
 .showpause svg{width:13px;height:13px;fill:currentColor}
 .showpause[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+
+/* What the garment earned, under the carousel. The track is NOT the target -
+   it runs to the best example in the set - and the target is the tick part way
+   along it, so every bar visibly overshoots the mark rather than all of them
+   sitting flat at full. */
+.showgoal{display:grid;gap:10px 22px;align-items:center;margin-top:18px}
+@media (min-width:760px){
+  .showgoal{grid-template-columns:auto minmax(140px,1fr) auto}
+}
+.showgoal .figs{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0}
+.showgoal .big{font-size:1.3rem;font-weight:600;letter-spacing:-.03em}
+.showgoal .of{color:var(--ink-3);font-size:.82rem}
+.showgoal .of b{color:var(--ink-2);font-weight:600}
+/* overflow:visible, unlike the .meter on the campaign screen, because the
+   target tick stands proud of the track at both ends. */
+.showgoal .meter{position:relative;height:8px;margin-top:0;overflow:visible}
+.showgoal .meter i{border-radius:var(--r-pill)}
+.showgoal .tick{
+  position:absolute;top:-5px;bottom:-5px;width:2px;
+  background:var(--ink-3);border-radius:2px;
+}
+.showgoal .over{margin:0;font-size:.82rem;color:var(--ink-3)}
+
+.showcase-lead{max-width:56ch;margin-top:26px;font-size:1.12rem}
 
 .dots{display:flex;gap:7px}
 .dots button{

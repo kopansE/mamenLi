@@ -9,3 +9,6 @@ assets/gown.glb
 supabase/.temp/
 
 render-env.txt
+
+# scripts/place-marks.js drops its previews and its generated table here
+scratch/

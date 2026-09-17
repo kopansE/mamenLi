@@ -23,6 +23,18 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300..800&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="assets/css/app.css">
+
+<!-- The first slide of the showcase, fetched before the script that asks for
+     it exists. This pair is deterministic - the men's tab is the default and
+     Roi is first - so the browser can be told about them while it is still
+     parsing the head, instead of finding out a round trip later. They are the
+     largest thing on the front door and the first thing anybody looks at.
+
+     Everything else on this page, including all twelve sponsor marks, is
+     served from our own origin under /assets. Nothing on the front door waits
+     on a CDN. -->
+<link rel="preload" as="image" href="assets/garments/p4-front.jpg">
+<link rel="preload" as="image" href="assets/garments/p4-back.jpg">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2314120E'/><rect x='11' y='11' width='10' height='10' rx='2' fill='%23C2502B'/></svg>">
 </head>
 <body>
@@ -70,9 +82,6 @@
     <div class="hero-copy" style="max-width:56ch">
       <p class="lbl">Advertising space you can walk around in</p>
       <h1>Walking billboards, <em>by the spot</em></h1>
-      <p class="lead">Somebody is about to spend a whole day being photographed. They post the front and
-        the back of what they are wearing and put a price on the fabric. You drag out the patch you want,
-        and what it costs follows how much of them you are covering.</p>
     </div>
   </section>
 
@@ -105,6 +114,28 @@
       <p class="hint" id="show-caption">—</p>
       <div class="dots" id="show-dots" role="tablist" aria-label="Which example"></div>
     </div>
+
+    <!-- What the garment earned. Every example clears its target - the point
+         being made is that this works, and by how much - so the bar is scaled
+         to the best of them and the target sits as a mark part way along it.
+         A bar that filled to 100% and stopped would hide the whole story. -->
+    <div class="showgoal">
+      <p class="figs">
+        <span class="big" id="show-raised">—</span>
+        <span class="of">raised · target <b id="show-target">—</b></span>
+      </p>
+      <div class="meter" id="show-meter" role="img">
+        <i id="show-bar"></i>
+        <span class="tick" id="show-tick" aria-hidden="true"></span>
+      </div>
+      <p class="over" id="show-over">—</p>
+    </div>
+
+    <!-- The explanation reads better after the picture than before it. Nobody
+         needs to be told what a logo on a gown is once they have seen one. -->
+    <p class="lead showcase-lead">Somebody is about to spend a whole day being photographed. They post
+      the front and the back of what they are wearing and put a price on the fabric. You drag out the
+      patch you want, and what it costs follows how much of them you are covering.</p>
   </section>
 
   <section class="wrap band tight">
@@ -395,12 +426,16 @@
       <p class="hint" id="role-permanent" style="margin-top:10px">This is permanent. It is what stops anyone
         listing a garment and then bidding on it themselves.</p>
 
+      <!-- Both forms carry this, not just sign-up: an account made with Google
+           has no password, so a sign-in screen without it is a locked door.
+           `hidden` here is the safe default - boot un-hides it, and only when
+           there is actually a project behind it. The words follow the mode. -->
       <div id="oauth-block" style="margin-top:22px" hidden>
         <button class="btn ghost wide" id="go-google" type="button">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-5 3.4-8.6Z"/><path fill="#34A853" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.7H1.8v3A11.5 11.5 0 0 0 12 24Z"/><path fill="#FBBC05" d="M5.6 14.7a6.9 6.9 0 0 1 0-4.4v-3H1.8a11.5 11.5 0 0 0 0 10.4l3.8-3Z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.2.6 4.4 1.7l3.3-3.3A11.5 11.5 0 0 0 1.8 7.3l3.8 3C6.5 6.8 9 4.8 12 4.8Z"/></svg>
-          <span>Continue with Google</span>
+          <span id="go-google-label">Continue with Google</span>
         </button>
-        <p class="lbl" style="text-align:center;margin:18px 0 4px">or with an email</p>
+        <p class="lbl" id="oauth-or" style="text-align:center;margin:18px 0 4px">or with an email</p>
       </div>
 
       <form id="auth-form" style="margin-top:24px" novalidate>
